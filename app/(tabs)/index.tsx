@@ -1,70 +1,144 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, SafeAreaView, Text, StyleSheet, FlatList, Button } from 'react-native';
+import { useAuth } from '@/context/AuthProvider';
+import AddCategoryModal from '@/components/AddCategoryModal'; // Import the new modal component
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+type Category = {
+  id: string;
+  name: string;
+  allocated: number;
+  available: number;
+};
 
-export default function HomeScreen() {
+export default function Tab() {
+  const { user } = useAuth();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [unallocatedFunds, setUnallocatedFunds] = useState<{ name: string; available: number } | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      if (user) {
+        try {
+          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/get-categories`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ user_id: user.uid }),
+          });
+          const data = await response.json();
+          const unallocated = data.categories.find((category: any) => category.is_unallocated_funds);
+          setUnallocatedFunds(unallocated);
+          setCategories(data.categories.filter((category: any) => !category.is_unallocated_funds));
+        } catch (error) {
+          console.error('Failed to fetch categories', error);
+        }
+      }
+    };
+
+    fetchCategories();
+  }, [user]);
+
+  const handleNewCategory = (newCategory: Category) => {
+    setCategories((prevCategories) => [...prevCategories, newCategory]);
+  };
+
+  const renderItem = ({ item }: { item: Category }) => (
+    <View style={styles.item}>
+      <Text style={styles.name}>{item.name}</Text>
+      <View style={styles.valuesContainer}>
+        <Text style={styles.value}>Allocated: ${item.allocated}</Text>
+        <Text style={styles.value}>Available: ${item.available}</Text>
+      </View>
+    </View>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({ ios: 'cmd + d', android: 'cmd + m' })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        {unallocatedFunds && (
+          <>
+            <Text style={styles.headerText}>{unallocatedFunds.name}</Text>
+            <Text style={styles.headerValue}>${unallocatedFunds.available}</Text>
+          </>
+        )}
+      </View>
+      <FlatList
+        data={categories}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        ListHeaderComponent={<View style={styles.listHeader} />}
+        ListFooterComponent={
+          <View style={styles.footer}>
+            <Button title="Add Category" onPress={() => setModalVisible(true)} />
+          </View>
+        }
+        stickyHeaderIndices={[0]}
+      />
+      <AddCategoryModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        userId={user?.uid}
+        onNewCategory={handleNewCategory}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  header: {
+    backgroundColor: '#f8f8f8',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
     flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  headerText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  headerValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  listContent: {
+    paddingHorizontal: 16,
+  },
+  listHeader: {
+    height: 0, // This is needed to make the sticky header work
+  },
+  item: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  name: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  valuesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  value: {
+    fontSize: 16,
+    color: '#666',
+    marginHorizontal: 8,
+  },
+  footer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
   },
 });
