@@ -1,87 +1,112 @@
-import React, { useEffect, useState } from 'react';
-import { View, SafeAreaView, Text, StyleSheet, FlatList, Button } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, SafeAreaView, Text, StyleSheet, FlatList, Button, Platform, TouchableOpacity } from 'react-native';
 import { useAuth } from '@/context/AuthProvider';
-import AddCategoryModal from '@/components/AddCategoryModal'; // Import the new modal component
+import { useCategories } from '@/context/CategoriesProvider';
+import AddCategoryModal from '@/components/AddCategoryModal';
+import AssignmentModal from '@/components/AssignmentModal';
+import DatePickers from '@/components/DatePickers';
+import { getAllocated } from '@/services/categories';
+import { Category } from '@/types';
 
-type Category = {
-  id: string;
-  name: string;
-  allocated: number;
-  available: number;
-};
+// type Category = {
+//   id: string;
+//   name: string;
+//   allocated: number;
+//   available: number;
+// };
 
 export default function Tab() {
   const { user } = useAuth();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [unallocatedFunds, setUnallocatedFunds] = useState<{ name: string; available: number } | null>(null);
+  const { categories, loading } = useCategories();
+  const [allocated, setAllocated] = useState<any[]>([]);
+  const [unallocatedFunds, setUnallocatedFunds] = useState<Category | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [startDate, setStartDate] = useState(new Date('2024-11-01T04:00:00Z'));
+  const [endDate, setEndDate] = useState(new Date('2024-11-14T23:59:59Z'));
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+
+  const fetchAllocated = useCallback(async () => {
+    if (user) {
+      try {
+        const data = await getAllocated(user.uid, startDate, endDate);
+        setAllocated(data.allocated);
+
+        const unallocated = categories.find((category: any) => category.is_unallocated_funds) || null;
+        setUnallocatedFunds(unallocated);
+      } catch (error) {
+        console.error('Failed to fetch allocated data', error);
+      }
+    }
+  }, [user, startDate, endDate, categories]);
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      if (user) {
-        try {
-          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/get-categories`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ user_id: user.uid }),
-          });
-          const data = await response.json();
-          const unallocated = data.categories.find((category: any) => category.is_unallocated_funds);
-          setUnallocatedFunds(unallocated);
-          setCategories(data.categories.filter((category: any) => !category.is_unallocated_funds));
-        } catch (error) {
-          console.error('Failed to fetch categories', error);
-        }
-      }
-    };
+    fetchAllocated();
+  }, [fetchAllocated]);
 
-    fetchCategories();
-  }, [user]);
-
-  const handleNewCategory = (newCategory: Category) => {
-    setCategories((prevCategories) => [...prevCategories, newCategory]);
+  const getAllocatedAmount = (categoryId: string) => {
+    const allocation = allocated.find((alloc) => alloc.category_id === categoryId);
+    return allocation ? allocation.allocated : 0;
   };
 
-  const renderItem = ({ item }: { item: Category }) => (
-    <View style={styles.item}>
-      <Text style={styles.name}>{item.name}</Text>
-      <View style={styles.valuesContainer}>
-        <Text style={styles.value}>Allocated: ${item.allocated}</Text>
-        <Text style={styles.value}>Available: ${item.available}</Text>
-      </View>
-    </View>
-  );
+  const renderItem = ({ item }: { item: Category }) => {
+    const allocatedAmount = getAllocatedAmount(item.id);
+    return (
+      <TouchableOpacity onPress={() => setSelectedCategory(item)}>
+        <View style={styles.item}>
+          <Text style={styles.name}>{item.name}</Text>
+          <View style={styles.valuesContainer}>
+            <Text style={styles.value}>Allocated: ${allocatedAmount.toFixed(2)}</Text>
+            <Text style={styles.value}>Available: ${item.available.toFixed(2)}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        {unallocatedFunds && (
-          <>
-            <Text style={styles.headerText}>{unallocatedFunds.name}</Text>
-            <Text style={styles.headerValue}>${unallocatedFunds.available}</Text>
-          </>
-        )}
+        <View style={styles.unallocatedContainer}>
+          {unallocatedFunds && (
+            <>
+              <Text style={styles.headerText}>{unallocatedFunds.name}</Text>
+              <Text style={styles.headerValue}>${unallocatedFunds.available.toFixed(2)}</Text>
+            </>
+          )}
+        </View>
+        <View style={styles.datePickersContainer}>
+          <DatePickers
+            startDate={startDate}
+            endDate={endDate}
+            setStartDate={setStartDate}
+            setEndDate={setEndDate}
+          />
+        </View>
       </View>
-      <FlatList
-        data={categories}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={<View style={styles.listHeader} />}
-        ListFooterComponent={
-          <View style={styles.footer}>
-            <Button title="Add Category" onPress={() => setModalVisible(true)} />
-          </View>
-        }
-        stickyHeaderIndices={[0]}
-      />
+      {categories.length > 0 && (
+        <FlatList
+          data={categories.filter((category: any) => !category.is_unallocated_funds)}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          ListFooterComponent={
+            <View style={styles.footer}>
+              <Button title="Add Category" onPress={() => setModalVisible(true)} />
+            </View>
+          }
+        />
+      )}
       <AddCategoryModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         userId={user?.uid}
-        onNewCategory={handleNewCategory}
+        onNewCategory={() => fetchAllocated()} // Refresh categories after adding
+      />
+      <AssignmentModal
+        visible={!!selectedCategory}
+        onClose={() => setSelectedCategory(null)}
+        category={selectedCategory}
+        userId={user?.uid || ''}
       />
     </SafeAreaView>
   );
@@ -99,6 +124,13 @@ const styles = StyleSheet.create({
     borderBottomColor: '#ddd',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  unallocatedContainer: {
+    flexDirection: 'column',
+  },
+  datePickersContainer: {
+    flexDirection: 'row',
   },
   headerText: {
     fontSize: 20,
@@ -111,9 +143,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-  },
-  listHeader: {
-    height: 0, // This is needed to make the sticky header work
   },
   item: {
     flexDirection: 'row',

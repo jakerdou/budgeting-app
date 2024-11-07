@@ -11,7 +11,7 @@ app = FastAPI()
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8081", "http://192.168.4.132:19000", "http://172.29.146.9:19000"],  # Change this to the address of your Expo app
+    allow_origins=["http://localhost:8081", "http://192.168.4.132:19000", "http://172.29.158.149:19000"],  # Change this to the address of your Expo app
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods
     allow_headers=["*"],  # Allow all headers
@@ -37,6 +37,11 @@ class User(BaseModel):
 # Request model for the POST request
 class UserIDRequest(BaseModel):
     user_id: str
+
+class CategoriesWithAllocatedRequest(BaseModel):
+    user_id: str
+    start_date: datetime
+    end_date: datetime
 
 class Category(BaseModel):
     name: str
@@ -122,6 +127,66 @@ async def get_categories(request: UserIDRequest):
     except Exception as e:
         logger.error("Failed to get categories for user_id: %s, error: %s", request.user_id, e)
         raise HTTPException(status_code=500, detail=f"Failed to get categories: %e")
+
+@app.post("/get-categories-with-allocated")
+async def get_categories_with_allocated(request: CategoriesWithAllocatedRequest):
+    try:
+        logger.info("Fetching categories with allocated amounts for user_id: %s", request.user_id)
+        
+        # Query categories with a `user_id` field equal to `request.user_id`
+        categories_query = db.collection("categories").where("user_id", "==", request.user_id)
+        categories_docs = categories_query.stream()
+
+        # Collect categories into a list, converting each document to a dictionary
+        categories = []
+        for doc in categories_docs:
+            category_data = doc.to_dict()
+            category_data["id"] = doc.id  # Add the category ID to the response
+            
+            # Calculate allocated amount for the category
+            assignments_query = db.collection("assignments").where("category_id", "==", doc.id).where("date", ">=", request.start_date).where("date", "<=", request.end_date)
+            assignments_docs = assignments_query.stream()
+            allocated_amount = sum(assignment.to_dict().get("amount", 0.0) for assignment in assignments_docs)
+            
+            category_data["allocated"] = allocated_amount
+            categories.append(category_data)
+
+        logger.info("Successfully fetched categories with allocated amounts for user_id: %s", request.user_id)
+        return {"categories": categories}
+    
+    except Exception as e:
+        logger.error("Failed to get categories with allocated amounts for user_id: %s, error: %s", request.user_id, e)
+        raise HTTPException(status_code=500, detail=f"Failed to get categories with allocated amounts: {e}")
+
+@app.post("/get-allocated")
+async def get_categories_with_allocated(request: CategoriesWithAllocatedRequest):
+    try:
+        logger.info("Fetching categories with allocated amounts for user_id: %s", request.user_id)
+        
+        # Query categories with a `user_id` field equal to `request.user_id`
+        categories_query = db.collection("categories").where("user_id", "==", request.user_id)
+        categories_docs = categories_query.stream()
+
+        # Collect categories into a list, converting each document to a dictionary
+        allocated = []
+        for doc in categories_docs:
+            allocated_data = {}
+            allocated_data["category_id"] = doc.id  # Add the category ID to the response
+            
+            # Calculate allocated amount for the category
+            assignments_query = db.collection("assignments").where("category_id", "==", doc.id).where("date", ">=", request.start_date).where("date", "<=", request.end_date)
+            assignments_docs = assignments_query.stream()
+            allocated_amount = sum(assignment.to_dict().get("amount", 0.0) for assignment in assignments_docs)
+            
+            allocated_data["allocated"] = allocated_amount
+            allocated.append(allocated_data)
+
+        logger.info("Successfully fetched allocated amounts for user_id: %s", request.user_id)
+        return {"allocated": allocated}
+    
+    except Exception as e:
+        logger.error("Failed to get categories with allocated amounts for user_id: %s, error: %s", request.user_id, e)
+        raise HTTPException(status_code=500, detail=f"Failed to get categories with allocated amounts: {e}")
 
 @app.post("/create-category")
 async def create_category(category: Category):

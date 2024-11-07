@@ -1,0 +1,4 @@
+be able to update transactions (mostly update their categories)
+integrate with plaid to get transactions
+be able to delete transactions
+be able to delete categories when no transactions correspond to them

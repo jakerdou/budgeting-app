@@ -7,24 +7,24 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Budget',
-          headerShown: false,
+          title: 'Budgeting App',
+          // headerShown: false,
           tabBarIcon: ({ color }) => <FontAwesome size={28} name="dollar" color={color} />,
         }}
       />
       <Tabs.Screen
         name="transactions"
         options={{
-          title: 'Transactions',
-          headerShown: false,
+          title: 'Budgeting App',
+          // headerShown: false,
           tabBarIcon: ({ color }) => <FontAwesome size={28} name="list" color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          headerShown: false,
+          title: 'Budgeting App',
+          // headerShown: false,
           tabBarIcon: ({ color }) => <FontAwesome size={28} name="cog" color={color} />,
         }}
       />

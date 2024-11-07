@@ -3,6 +3,7 @@ import React from 'react';
 import { Stack } from 'expo-router';
 import { Text, View } from 'react-native';
 import { AuthProvider, useAuth } from '@/context/AuthProvider';
+import { CategoriesProvider } from '@/context/CategoriesProvider';
 import LoginScreen from './login';
 
 function RootLayout() {
@@ -24,7 +25,7 @@ function RootLayout() {
 
   return (
     <Stack>
-      <Stack.Screen name="(tabs)" options={{title: "Budgeting App"}} />
+      <Stack.Screen name="(tabs)" options={{ title: "Budgeting App", headerShown: false }} />
       {/* <Stack.Screen name="(tabs)" options={{ headerShown: false }} /> */}
     </Stack>
   );
@@ -33,7 +34,9 @@ function RootLayout() {
 export default function App() {
   return (
     <AuthProvider>
-      <RootLayout />
+      <CategoriesProvider>
+        <RootLayout />
+      </CategoriesProvider>
     </AuthProvider>
   );
 }

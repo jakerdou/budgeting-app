@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, Modal, TextInput, Button, StyleSheet } from 'react-native';
+import { addCategory } from '@/services/categories';
 
 type AddCategoryModalProps = {
   visible: boolean;
   onClose: () => void;
+  // TODO: Maybe take this from provider
   userId: string | undefined;
   onNewCategory: (newCategory: { id: string; name: string; allocated: number; available: number }) => void;
 };
@@ -13,35 +15,16 @@ const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onClose, u
 
   const handleAddCategory = async () => {
     if (userId) {
-      try {
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/create-category`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            user_id: userId,
-            name: newCategoryName,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const newCategory = {
-            id: data.category_id,
-            name: newCategoryName,
-            allocated: 0,
-            available: 0,
-          };
-          onNewCategory(newCategory); // Notify parent component
-          setNewCategoryName('');
-          onClose();
-        } else {
-          console.error('Failed to create category', await response.text());
-        }
-      } catch (error) {
-        console.error('Failed to create category', error);
-      }
+      const data = await addCategory(userId, newCategoryName);
+      const newCategory = {
+        id: data.category_id,
+        name: newCategoryName,
+        allocated: 0,
+        available: 0,
+      };
+      onNewCategory(newCategory); // Notify parent component
+      setNewCategoryName('');
+      onClose();
     }
   };
 
