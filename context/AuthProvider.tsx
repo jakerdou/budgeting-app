@@ -1,29 +1,53 @@
 // app/context/AuthProvider.tsx
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore'; // Assuming Firestore is used
+import { db } from '../firebaseConfig'; // Import your Firestore instance
 
 type AuthContextType = {
-  user: { email: string; uid: string } | null;
+  user: { email: string; uid: string; preferences?: any } | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
+  updateUserPreferences: (newPreferences: any) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<{ email: string; uid: string } | null>(null);
+  const [user, setUser] = useState<{ email: string; uid: string; preferences?: any } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        setUser({
-          email: firebaseUser.email!,
-          uid: firebaseUser.uid,  // Capture and store the UID
-        });
+        // Fetch preferences
+        try {
+          const userRef = doc(db, 'users', firebaseUser.uid); // Fetch document by UID
+          const userSnap = await getDoc(userRef);
+          let preferences = userSnap.exists() ? userSnap.data().preferences : {};
+
+          // Convert start_date to ISO string
+          if (preferences.pay_schedule?.start_date) {
+            preferences = {
+              ...preferences,
+              pay_schedule: {
+                ...preferences.pay_schedule,
+                start_date: new Date(preferences.pay_schedule.start_date.seconds * 1000).toISOString(),
+              },
+            };
+          }
+
+          setUser({
+            email: firebaseUser.email!,
+            uid: firebaseUser.uid,
+            preferences, // Add preferences to user object
+          });
+        } catch (error) {
+          console.error('Failed to fetch user preferences:', error);
+        }
       } else {
         setUser(null);
       }
@@ -31,6 +55,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => unsubscribe();
   }, []);
+
+  const updateUserPreferences = (newPreferences: any) => {
+    setUser((prevUser) => {
+      if (prevUser) {
+        return { ...prevUser, preferences: newPreferences };
+      }
+      return prevUser;
+    });
+  };
 
   const login = async (email: string, password: string) => {
     try {
@@ -44,7 +77,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
-      console.log('email', email, 'user_id', firebaseUser.uid);
       await fetch(`${process.env.EXPO_PUBLIC_API_URL}/create-user`, {
         method: 'POST',
         headers: {
@@ -52,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         body: JSON.stringify({
           email: firebaseUser.email,
-          user_id: firebaseUser.uid,  // Send UID to backend
+          user_id: firebaseUser.uid,
         }),
       });
     } catch (error) {
@@ -69,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, loading, updateUserPreferences }}>
       {children}
     </AuthContext.Provider>
   );

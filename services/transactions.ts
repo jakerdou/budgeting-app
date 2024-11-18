@@ -41,3 +41,44 @@ export const addTransaction = async (userId: string, amount: number, categoryId:
     return data;
 };
 
+export const deleteTransaction = async (userId: string, transactionId: string) => {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/delete-transaction`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            transaction_id: transactionId,
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to delete transaction');
+    }
+
+    const data = await response.json();
+    return data;
+};
+
+export const updateTransactionCategory = async (userId: string, transactionId: string, categoryId: string) => {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/update-transaction-category`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            transaction_id: transactionId,
+            category_id: categoryId
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to update transaction category');
+    }
+
+    const data = await response.json();
+    return data;
+};
+

@@ -1,19 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, SafeAreaView, Text, StyleSheet, FlatList, Button, Platform, TouchableOpacity } from 'react-native';
+import { View, SafeAreaView, Text, StyleSheet, FlatList, Button, TouchableOpacity } from 'react-native';
 import { useAuth } from '@/context/AuthProvider';
 import { useCategories } from '@/context/CategoriesProvider';
-import AddCategoryModal from '@/components/AddCategoryModal';
-import AssignmentModal from '@/components/AssignmentModal';
-import DatePickers from '@/components/DatePickers';
+import AddCategoryModal from '@/components/budget/AddCategoryModal';
+import AssignmentModal from '@/components/budget/AssignmentModal';
+import DatePickers from '@/components/budget/DatePickers';
 import { getAllocated } from '@/services/categories';
 import { Category } from '@/types';
-
-// type Category = {
-//   id: string;
-//   name: string;
-//   allocated: number;
-//   available: number;
-// };
+import {
+  setMonthlyDates,
+  setBiWeeklyDates,
+  setYearlyDates,
+  setPreviousBudgetPeriodTimeFrame,
+  setNextBudgetPeriodTimeFrame
+} from '@/utils/dateUtils';
 
 export default function Tab() {
   const { user } = useAuth();
@@ -21,15 +21,30 @@ export default function Tab() {
   const [allocated, setAllocated] = useState<any[]>([]);
   const [unallocatedFunds, setUnallocatedFunds] = useState<Category | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [startDate, setStartDate] = useState(new Date('2024-11-01T04:00:00Z'));
-  const [endDate, setEndDate] = useState(new Date('2024-11-14T23:59:59Z'));
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [budgetPeriod, setBudgetPeriod] = useState(user?.preferences.budget_period);
+
+  useEffect(() => {
+    if (budgetPeriod === 'monthly') {
+      setMonthlyDates(setStartDate, setEndDate);
+    } else if (budgetPeriod === 'bi-weekly') {
+      setBiWeeklyDates(user?.preferences.pay_schedule || {}, setStartDate, setEndDate);
+    } else if (budgetPeriod === 'yearly') {
+      setYearlyDates(setStartDate, setEndDate);
+    }
+  }, [budgetPeriod, user]);
 
   const fetchAllocated = useCallback(async () => {
     if (user) {
       try {
         const data = await getAllocated(user.uid, startDate, endDate);
         setAllocated(data.allocated);
+
+        // console.log('data', data);
+        // console.log('allocated', data.allocated);
+        // console.log('categories', categories);
 
         const unallocated = categories.find((category: any) => category.is_unallocated_funds) || null;
         setUnallocatedFunds(unallocated);
@@ -63,9 +78,25 @@ export default function Tab() {
     );
   };
 
+  if (loading) {
+    return <Text>Loading...</Text>;
+  }
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        <View style={styles.datePickersContainer}>
+          <DatePickers
+            startDate={startDate}
+            endDate={endDate}
+            setStartDate={setStartDate}
+            setEndDate={setEndDate}
+            preferences={user?.preferences}
+            setBudgetPeriod={setBudgetPeriod}
+            budgetPeriod={budgetPeriod}
+            setPreviousBudgetPeriodTimeFrame={setPreviousBudgetPeriodTimeFrame}
+            setNextBudgetPeriodTimeFrame={setNextBudgetPeriodTimeFrame}
+          />
+        </View>
         <View style={styles.unallocatedContainer}>
           {unallocatedFunds && (
             <>
@@ -73,14 +104,6 @@ export default function Tab() {
               <Text style={styles.headerValue}>${unallocatedFunds.available.toFixed(2)}</Text>
             </>
           )}
-        </View>
-        <View style={styles.datePickersContainer}>
-          <DatePickers
-            startDate={startDate}
-            endDate={endDate}
-            setStartDate={setStartDate}
-            setEndDate={setEndDate}
-          />
         </View>
       </View>
       {categories.length > 0 && (
@@ -128,6 +151,7 @@ const styles = StyleSheet.create({
   },
   unallocatedContainer: {
     flexDirection: 'column',
+    alignItems: 'center', // Add this line to center the text
   },
   datePickersContainer: {
     flexDirection: 'row',

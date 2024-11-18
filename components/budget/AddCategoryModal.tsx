@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Platform } from 'react-native';
+import Modal from 'react-native-modal'; // Importing react-native-modal
 import { addCategory } from '@/services/categories';
 
 type AddCategoryModalProps = {
   visible: boolean;
   onClose: () => void;
-  // TODO: Maybe take this from provider
   userId: string | undefined;
   onNewCategory: (newCategory: { id: string; name: string; allocated: number; available: number }) => void;
 };
@@ -29,19 +29,25 @@ const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onClose, u
   };
 
   return (
-    <Modal animationType="slide" transparent={true} visible={visible} onRequestClose={onClose}>
-      <View style={styles.modalContainer}>
-        <View style={styles.modalView}>
-          <Text style={styles.modalText}>Add New Category</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Category Name"
-            value={newCategoryName}
-            onChangeText={setNewCategoryName}
-          />
-          <Button title="Add" onPress={handleAddCategory} />
-          <Button title="Cancel" onPress={onClose} />
-        </View>
+    <Modal
+      isVisible={visible}
+      onBackdropPress={onClose}
+      onBackButtonPress={onClose}
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      backdropOpacity={0.5}
+      style={styles.modalContainer}
+    >
+      <View style={styles.modalView}>
+        <Text style={styles.modalText}>Add New Category</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Category Name"
+          value={newCategoryName}
+          onChangeText={setNewCategoryName}
+        />
+        <Button title="Add" onPress={handleAddCategory} />
+        <Button title="Cancel" onPress={onClose} />
       </View>
     </Modal>
   );
@@ -49,26 +55,24 @@ const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onClose, u
 
 const styles = StyleSheet.create({
   modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    // backgroundColor: 'white',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    margin: 0, // Take up full screen
+    justifyContent: 'flex-end', // Align to the bottom
   },
   modalView: {
-    width: 300,
     backgroundColor: 'white',
-    borderRadius: 10,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 20,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: -2,
     },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    height: '75%', // Adjust this to take up the desired height
   },
   modalText: {
     fontSize: 18,

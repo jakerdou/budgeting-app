@@ -1,4 +1,43 @@
-be able to update transactions (mostly update their categories)
-integrate with plaid to get transactions
-be able to delete transactions
-be able to delete categories when no transactions correspond to them
+to make mvp:
+    fix change transaction category on ios
+
+    make monthly next and previous function correctly
+
+    be able to delete categories when no transactions correspond to them
+
+    integrate with plaid
+    add fetch transactions button that will fetch from plaid
+
+
+less important
+    go through index.tsx and datepickers and rename variables maybe to make it less confusing, different things are called budtet period and pay period
+
+    maybe make frontend display amount of unallocated funds you have from the current budget period (basically the sum of the transactions assigned to unallocated funds category for that period of time)
+
+    figure out why categories sometimes comes back empty
+
+    make add transaction button a plus icon
+
+    add color stylings
+
+    have unified format date function
+
+    handle case where start date is after current date
+
+    make transaction category a dropdown button that changes the category
+
+    make times consistent across app and database
+        put timezone in user preferences
+
+        save as midnight local time (according to user.preferences.time_zone)
+            pay period start date
+            manually added transaction date
+
+        display as local time
+            date pickers in budget page
+            date in transaction page
+            start date in preferences page
+
+        make sure that set start/end date and set next/prev start/end date functions are all using timezone user preference
+
+        

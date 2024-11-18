@@ -9,7 +9,7 @@ import LoginScreen from './login';
 function RootLayout() {
   const { user, loading } = useAuth();
 
-  console.log('user', user);
+  // console.log('user', user);
 
   if (loading) {
     return (
@@ -26,7 +26,6 @@ function RootLayout() {
   return (
     <Stack>
       <Stack.Screen name="(tabs)" options={{ title: "Budgeting App", headerShown: false }} />
-      {/* <Stack.Screen name="(tabs)" options={{ headerShown: false }} /> */}
     </Stack>
   );
 }
