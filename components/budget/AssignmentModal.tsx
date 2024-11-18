@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Button, TextInput, StyleSheet } from 'react-native';
 import Modal from 'react-native-modal'; // Importing react-native-modal
-import { createAssignment } from '@/services/categories';
+import { createAssignment } from '@/services/assignments'; // Importing the createAssignment function from the API
+
 
 type AssignmentModalProps = {
   visible: boolean;

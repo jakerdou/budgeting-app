@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { useCategories } from '@/context/CategoriesProvider';
 import AddCategoryModal from '@/components/budget/AddCategoryModal';
 import AssignmentModal from '@/components/budget/AssignmentModal';
-import DatePickers from '@/components/budget/DatePickers';
+import BudgetTabHeader from '@/components/budget/BudgetTabHeader';
 import { getAllocated } from '@/services/categories';
 import { Category } from '@/types';
 import {
@@ -41,10 +41,6 @@ export default function Tab() {
       try {
         const data = await getAllocated(user.uid, startDate, endDate);
         setAllocated(data.allocated);
-
-        // console.log('data', data);
-        // console.log('allocated', data.allocated);
-        // console.log('categories', categories);
 
         const unallocated = categories.find((category: any) => category.is_unallocated_funds) || null;
         setUnallocatedFunds(unallocated);
@@ -83,29 +79,18 @@ export default function Tab() {
   }
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.datePickersContainer}>
-          <DatePickers
-            startDate={startDate}
-            endDate={endDate}
-            setStartDate={setStartDate}
-            setEndDate={setEndDate}
-            preferences={user?.preferences}
-            setBudgetPeriod={setBudgetPeriod}
-            budgetPeriod={budgetPeriod}
-            setPreviousBudgetPeriodTimeFrame={setPreviousBudgetPeriodTimeFrame}
-            setNextBudgetPeriodTimeFrame={setNextBudgetPeriodTimeFrame}
-          />
-        </View>
-        <View style={styles.unallocatedContainer}>
-          {unallocatedFunds && (
-            <>
-              <Text style={styles.headerText}>{unallocatedFunds.name}</Text>
-              <Text style={styles.headerValue}>${unallocatedFunds.available.toFixed(2)}</Text>
-            </>
-          )}
-        </View>
-      </View>
+      <BudgetTabHeader
+        startDate={startDate}
+        endDate={endDate}
+        setStartDate={setStartDate}
+        setEndDate={setEndDate}
+        userPreferences={user?.preferences}
+        setBudgetPeriod={setBudgetPeriod}
+        budgetPeriod={budgetPeriod}
+        setPreviousBudgetPeriodTimeFrame={setPreviousBudgetPeriodTimeFrame}
+        setNextBudgetPeriodTimeFrame={setNextBudgetPeriodTimeFrame}
+        unallocatedFunds={unallocatedFunds}
+      />
       {categories.length > 0 && (
         <FlatList
           data={categories.filter((category: any) => !category.is_unallocated_funds)}
@@ -139,31 +124,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  header: {
-    backgroundColor: '#f8f8f8',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  unallocatedContainer: {
-    flexDirection: 'column',
-    alignItems: 'center', // Add this line to center the text
-  },
-  datePickersContainer: {
-    flexDirection: 'row',
-  },
-  headerText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  headerValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#666',
   },
   listContent: {
     paddingHorizontal: 16,

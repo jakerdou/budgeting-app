@@ -1,6 +1,6 @@
 export const getTransactions = async (userId: string) => {
 
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/get-transactions`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/get-transactions`, {
       method: 'POST',
       headers: {
       'Content-Type': 'application/json',
@@ -19,7 +19,7 @@ export const getTransactions = async (userId: string) => {
 };
 
 export const addTransaction = async (userId: string, amount: number, categoryId: string, name: string, date: string) => {
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/create-transaction`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/create-transaction`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -42,7 +42,7 @@ export const addTransaction = async (userId: string, amount: number, categoryId:
 };
 
 export const deleteTransaction = async (userId: string, transactionId: string) => {
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/delete-transaction`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/delete-transaction`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -62,7 +62,7 @@ export const deleteTransaction = async (userId: string, transactionId: string) =
 };
 
 export const updateTransactionCategory = async (userId: string, transactionId: string, categoryId: string) => {
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/update-transaction-category`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/update-transaction-category`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

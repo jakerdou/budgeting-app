@@ -77,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
-      await fetch(`${process.env.EXPO_PUBLIC_API_URL}/create-user`, {
+      await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_USER_PREFIX}/create-user`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -40,4 +40,8 @@ less important
 
         make sure that set start/end date and set next/prev start/end date functions are all using timezone user preference
 
+        rename top level api folder
+
+        get monthly budget period preference to work, budget period dropdown is messed up when budget period is monthly and pay_schedule is null or when we go from bi-weekly to monthly in budget period preferences and go back to budget page
+
         

@@ -21,7 +21,7 @@ expo-env.d.ts
 
 .env
 
-api/__pycache__/
+api/**/__pycache__/
 api/api-venv/
 api/budgeting-app-firebase-adminsdk.json
 

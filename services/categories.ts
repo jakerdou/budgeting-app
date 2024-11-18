@@ -1,5 +1,5 @@
 export const getCategoriesWithAllocated = async (userId: string, startDate: Date, endDate: Date) => {
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/get-categories-with-allocated`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_CATEGORY_PREFIX}/get-categories-with-allocated`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -20,7 +20,7 @@ export const getCategoriesWithAllocated = async (userId: string, startDate: Date
 };
 
 export const getAllocated = async (userId: string, startDate: Date, endDate: Date) => {
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/get-allocated`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_CATEGORY_PREFIX}/get-allocated`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -42,7 +42,7 @@ export const getAllocated = async (userId: string, startDate: Date, endDate: Dat
 
 export const addCategory = async (userId: string, newCategoryName: string) => {
 
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/create-category`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_CATEGORY_PREFIX}/create-category`, {
         method: 'POST',
         headers: {
         'Content-Type': 'application/json',
@@ -60,21 +60,4 @@ export const addCategory = async (userId: string, newCategoryName: string) => {
     const data = await response.json();
     return data;
 
-};
-
-export const createAssignment = async (assignment: { amount: number; user_id: string; category_id: string; date: string }) => {
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/create-assignment`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(assignment),
-    });
-
-    if (!response.ok) {
-        throw new Error('Failed to create assignment');
-    }
-
-    const data = await response.json();
-    return data;
 };

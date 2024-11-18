@@ -1,5 +1,5 @@
 export const getPreferences = async (userId: string) => {
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/get-preferences`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_USER_PREFIX}/get-preferences`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -18,7 +18,7 @@ export const getPreferences = async (userId: string) => {
 }
 
 export const updatePreferences = async (userId: string, preferences: any) => {
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/update-preferences`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_USER_PREFIX}/update-preferences`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
