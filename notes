@@ -1,4 +1,10 @@
+Fixes:
+    make budget period change when dropdown is changed on budget page
+
 to make mvp:
+    maybe forget plaid and use pnc and amex APIs
+        https://developer.pnc.com/documentation/products/Information-Reporting/4/overview?linkRef=documentation
+
     fix change transaction category on ios
 
     make monthly next and previous function correctly
@@ -7,6 +13,20 @@ to make mvp:
 
     integrate with plaid
     add fetch transactions button that will fetch from plaid
+
+    add account object to db and methods to fetch/create
+
+    add endpoint to call after successfully linking bank accounts through plaid that will:
+        save account id, name, user id and stuff to account object
+        save public token to user object
+    if user has public token, make a call to fetch their transactions when the app is opened maybe, look into how to do this, maybe have fetch transactions button
+
+    add place in app to unlink accounts and remove them from db
+
+    update object diagram in draw.io that will show the variables necessary for the account object and the updates to the user object (just public key I think)
+
+
+    there's an issue with plaid link on ios, look at homepage file from tiny quickstart and compare them to see if there's any issue
 
 
 less important
@@ -44,4 +64,6 @@ less important
 
         get monthly budget period preference to work, budget period dropdown is messed up when budget period is monthly and pay_schedule is null or when we go from bi-weekly to monthly in budget period preferences and go back to budget page
 
-        
+
+
+to be able to activate venv in windows - Set-ExecutionPolicy RemoteSigned -Scope CurrentUser

@@ -22,9 +22,11 @@ const DatePickers: React.FC<DatePickersProps> = ({ startDate, endDate, setStartD
     budgetPeriods.push('Pay Period');
   }
 
+  console.log('preferences', preferences);
+
   const budgetPeriodsMapping: { [key: string]: string } = {
-    'yearly': 'Yearly',
-    'monthly': 'Monthly',
+    'app-yearly': 'Yearly',
+    'app-monthly': 'Monthly',
     [preferences?.budget_period]: 'Pay Period',
   };
 
@@ -39,6 +41,8 @@ const DatePickers: React.FC<DatePickersProps> = ({ startDate, endDate, setStartD
     return `${month}-${day}-${year}`;
   };
 
+  console.log('budgetPeriod', budgetPeriodsMapping[budgetPeriod]);
+
   return (
     <View>
       <View style={styles.budgetPeriodContainer}>
@@ -49,9 +53,9 @@ const DatePickers: React.FC<DatePickersProps> = ({ startDate, endDate, setStartD
             selectedOption={budgetPeriodsMapping[budgetPeriod]}
             onSelect={(itemValue) => {
               if (itemValue === 'Yearly') {
-                setBudgetPeriod('yearly');
+                setBudgetPeriod('app-yearly');
               } else if (itemValue === 'Monthly') {
-                setBudgetPeriod('monthly');
+                setBudgetPeriod('app-monthly');
               } else if (itemValue === 'Pay Period') {
                 setBudgetPeriod(preferences?.budget_period);
               }
@@ -62,10 +66,11 @@ const DatePickers: React.FC<DatePickersProps> = ({ startDate, endDate, setStartD
           <Picker
             selectedValue={budgetPeriodsMapping[budgetPeriod]}
             onValueChange={(itemValue) => {
+              console.log('itemValue', itemValue);
               if (itemValue === 'Yearly') {
-                setBudgetPeriod('yearly');
+                setBudgetPeriod('app-yearly');
               } else if (itemValue === 'Monthly') {
-                setBudgetPeriod('monthly');
+                setBudgetPeriod('app-monthly');
               } else if (itemValue === 'Pay Period') {
                 setBudgetPeriod(preferences?.budget_period);
               }

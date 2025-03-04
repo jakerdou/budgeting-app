@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, Text, Button, StyleSheet } from 'react-native';
+import { View, Text, Button, StyleSheet, Platform } from 'react-native';
+import BankLinkButtonIOS from './BankLinkButtonIOS';
+import BankLinkButtonWeb from './BankLinkButtonWeb';
 
 interface TransactionsTabHeaderProps {
   onAddTransactionPress: () => void;
@@ -9,6 +11,8 @@ const TransactionsTabHeader: React.FC<TransactionsTabHeaderProps> = ({ onAddTran
   return (
     <View style={styles.header}>
       <Text style={styles.title}>Transactions</Text>
+        {Platform.OS === 'web' && <BankLinkButtonWeb />}
+        {/* {Platform.OS === 'web' ? <BankLinkButtonWeb /> : Platform.OS === 'ios' ? <BankLinkButtonIOS /> : null} */}
       <Button title="Add Transaction" onPress={onAddTransactionPress} />
     </View>
   );
