@@ -2,6 +2,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from .db import db
+from .plaid_utils import get_plaid_transactions, get_saved_cursor  # Assuming helper functions exist for Plaid API calls
+from backend.db.schemas import Transaction as TransactionSchema
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -22,7 +28,7 @@ class Transaction(BaseModel):
     user_id: str
     category_id: str
     name: str
-    date: datetime
+    date: str
 
 class DeleteTransactionRequest(BaseModel):
     user_id: str
@@ -32,6 +38,9 @@ class UpdateTransactionCategoryRequest(BaseModel):
     user_id: str
     transaction_id: str
     category_id: str
+
+class SyncPlaidTransactionsRequest(BaseModel):
+    user_id: str
 
 @router.post("/get-transactions")
 async def get_transactions(request: UserIDRequest):
@@ -50,6 +59,9 @@ async def get_transactions(request: UserIDRequest):
             
             # Remove or handle any unserializable fields here, if necessary
             transactions.append(transaction_data)
+
+        # Sort transactions by date (most to least recent)
+        transactions.sort(key=lambda x: x["date"], reverse=True)
 
         # logger.info("Successfully fetched transactions for user_id: %s", request.user_id)
         # logger.info("Transactions: %s", transactions)
@@ -75,16 +87,19 @@ async def create_transaction(transaction: Transaction):
         if not category_doc.exists:
             raise HTTPException(status_code=404, detail="Category not found")
         
+        # Create a validated transaction using our schema
+        transaction_schema = TransactionSchema(
+            amount=transaction.amount,
+            user_id=transaction.user_id,
+            category_id=transaction.category_id,
+            name=transaction.name,
+            date=transaction.date,
+            type="debit" if transaction.amount < 0 else "credit"
+        )
+        
+        # Convert to dict and save to Firestore
         transaction_ref = db.collection("transactions").document()
-        transaction_ref.set({
-            "amount": transaction.amount,
-            "user_id": transaction.user_id,
-            "category_id": transaction.category_id,
-            "name": transaction.name,
-            "date": transaction.date,
-            "type": "debit" if transaction.amount < 0 else "credit",
-            "created_at": datetime.now(timezone.utc)
-        })
+        transaction_ref.set(transaction_schema.to_dict())
         
         if category_doc.exists:
             category_data = category_doc.to_dict()
@@ -93,9 +108,12 @@ async def create_transaction(transaction: Transaction):
         
         # logger.info("Transaction created successfully with ID: %s", transaction_ref.id)
         return {"message": "Transaction created successfully.", "transaction_id": transaction_ref.id}
+    except ValueError as e:
+        # This will catch validation errors from the Pydantic model
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         # logger.error("Failed to create transaction: %s", e)
-        raise HTTPException(status_code=500, detail=f"Failed to create transaction: %e")
+        raise HTTPException(status_code=500, detail=f"Failed to create transaction: {str(e)}")
 
 @router.post("/delete-transaction")
 async def delete_transaction(request: DeleteTransactionRequest):
@@ -136,50 +154,226 @@ async def delete_transaction(request: DeleteTransactionRequest):
 @router.post("/update-transaction-category")
 async def update_transaction_category(request: UpdateTransactionCategoryRequest):
     try:
-        # logger.info("Updating category for transaction_id: %s for user_id: %s to category_id: %s", request.transaction_id, request.user_id, request.category_id)
+        print(f"Received request to update transaction category: {request}")
         
         transaction_ref = db.collection("transactions").document(request.transaction_id)
         transaction_doc = transaction_ref.get()
         
         if not transaction_doc.exists:
+            print(f"Transaction with ID {request.transaction_id} not found.")
             raise HTTPException(status_code=404, detail="Transaction not found")
         
         transaction_data = transaction_doc.to_dict()
+        print(f"Transaction data: {transaction_data}")
         
         if transaction_data["user_id"] != request.user_id:
+            print(f"User ID mismatch: {transaction_data['user_id']} != {request.user_id}")
             raise HTTPException(status_code=403, detail="User ID does not match the transaction")
         
-        old_category_ref = db.collection("categories").document(transaction_data["category_id"])
-        old_category_doc = old_category_ref.get()
+        old_category_id = transaction_data.get("category_id")
+        old_category_ref = db.collection("categories").document(old_category_id) if old_category_id else None
+        old_category_doc = old_category_ref.get() if old_category_ref and callable(old_category_ref.get) else None
         
-        if not old_category_doc.exists:
+        if old_category_id and old_category_doc and not old_category_doc.exists:
+            print(f"Old category with ID {old_category_id} not found.")
             raise HTTPException(status_code=404, detail="Old category not found")
         
-        new_category_ref = db.collection("categories").document(request.category_id)
-        new_category_doc = new_category_ref.get()
+        old_category_data = old_category_doc.to_dict() if old_category_doc else None
+        print(f"Old category data: {old_category_data}")
         
-        if not new_category_doc.exists:
+        new_category_ref = db.collection("categories").document(request.category_id)
+        new_category_doc = new_category_ref.get() if callable(new_category_ref.get) else None
+        
+        if not new_category_doc or not new_category_doc.exists:
+            print(f"New category with ID {request.category_id} not found.")
             raise HTTPException(status_code=404, detail="New category not found")
         
         new_category_data = new_category_doc.to_dict()
+        print(f"New category data: {new_category_data}")
         
         if new_category_data["user_id"] != request.user_id:
+            print(f"New category user ID mismatch: {new_category_data['user_id']} != {request.user_id}")
             raise HTTPException(status_code=403, detail="New category does not belong to the user")
         
         # Update the transaction's category_id
+        print(f"Updating transaction {request.transaction_id} to new category {request.category_id}")
         transaction_ref.update({"category_id": request.category_id})
 
         # Adjust the available amounts in the old and new categories
         transaction_amount = transaction_data["amount"]
-        old_category_data = old_category_doc.to_dict()
-        new_old_available = old_category_data.get("available", 0.0) - transaction_amount
-        old_category_ref.update({"available": new_old_available})
-
+        print(f"Transaction amount: {transaction_amount}")
+        
+        if old_category_data:
+            print(f"Old category available before update: {old_category_data.get('available', 0.0)}")
+            new_old_available = old_category_data.get("available", 0.0) - transaction_amount
+            old_category_ref.update({"available": new_old_available})
+            print(f"Updated old category available amount to {new_old_available}")
+        else:
+            print("No old category to update (transaction was uncategorized).")
+        
+        print(f"New category available before update: {new_category_data.get('available', 0.0)}")
         new_new_available = new_category_data.get("available", 0.0) + transaction_amount
         new_category_ref.update({"available": new_new_available})
+        print(f"Updated new category available amount to {new_new_available}")
         
-        # logger.info("Transaction category updated successfully for transaction_id: %s", request.transaction_id)
+        print(f"Transaction category updated successfully for transaction_id: {request.transaction_id}")
         return {"message": "Transaction category updated successfully.", "transaction_id": request.transaction_id}
     except Exception as e:
-        # logger.error("Failed to update transaction category: %s", e)
+        print(f"Error updating transaction category: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update transaction category: {e}")
+
+@router.post("/sync-plaid-transactions")
+async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):
+    try:
+        print(f"Starting sync for user_id: {request.user_id}")
+        
+        user_id = request.user_id
+        plaid_items_query = db.collection("plaid_items").where("user_id", "==", user_id)
+        plaid_items_docs = list(plaid_items_query.stream())  # Convert to list so we can iterate twice
+
+        added_transactions = []
+        modified_transactions = []
+        deleted_transactions = []
+        
+        # Keep track of which item each transaction belongs to
+        transaction_item_map = {}
+        
+        # Store cursor updates to apply later
+        cursor_updates = {}
+
+        for item_doc in plaid_items_docs:
+            item_data = item_doc.to_dict()
+            item_id = item_doc.id
+            print(f"Processing Plaid item: {item_data['institution_name']}")
+            # print(f"Processing Plaid item with access_token: {item_data['access_token']}")
+            
+            saved_cursor = item_data.get("cursor")
+            has_more = True
+            last_cursor = None
+
+            while has_more:
+                plaid_response = get_plaid_transactions(item_data["access_token"], cursor=saved_cursor)
+                # print(f"Fetched transactions from Plaid: {plaid_response}")
+
+                # Save the new cursor value (but don't update the database yet)
+                new_cursor = plaid_response.get("next_cursor")
+                if new_cursor:
+                    last_cursor = new_cursor
+                    saved_cursor = new_cursor
+
+                # Associate each transaction with this Plaid item's data
+                for trans in plaid_response.get("added", []):
+                    transaction_item_map[trans["transaction_id"]] = item_data
+                
+                for trans in plaid_response.get("modified", []):
+                    transaction_item_map[trans["transaction_id"]] = item_data
+                
+                for trans in plaid_response.get("removed", []):
+                    transaction_item_map[trans["transaction_id"]] = item_data
+
+                added_transactions.extend(plaid_response.get("added", []))
+                modified_transactions.extend(plaid_response.get("modified", []))
+                deleted_transactions.extend(plaid_response.get("removed", []))
+
+                # Check if there are more transactions to sync
+                has_more = plaid_response.get("has_more", False)
+                print(f"Has more transactions: {has_more}")
+            
+            # Store the last cursor for this item to update later
+            if last_cursor:
+                cursor_updates[item_id] = last_cursor
+
+        # Process added transactions
+        print(f"Processing {len(added_transactions)} added transactions")
+        for transaction in added_transactions:
+            # Get the correct item_data for this transaction
+            item_data = transaction_item_map.get(transaction["transaction_id"])
+            if not item_data:
+                print(f"Warning: No item data found for transaction {transaction['transaction_id']}")
+                continue
+
+            print(f"Adding transaction: {transaction['transaction_id']}")
+
+            account_name = next(
+                (account["name"] for account in item_data.get("accounts", []) if account["account_id"] == transaction["account_id"]),
+                None
+            )
+
+            # Create a validated transaction using our schema
+            transaction_schema = TransactionSchema(
+                amount=-transaction["amount"],
+                name=transaction["name"],
+                date=transaction['date'].strftime("%Y-%m-%d"),
+                user_id=user_id,
+                plaid_transaction_id=transaction["transaction_id"],
+                institution_name=item_data["institution_name"],
+                account_name=account_name
+            )
+            
+            transaction_ref = db.collection("transactions").document()
+            transaction_ref.set(transaction_schema.to_dict())
+
+        # Process modified transactions
+        print(f"Processing {len(modified_transactions)} modified transactions")
+        for transaction in modified_transactions:
+            # Get the correct item_data for this transaction
+            item_data = transaction_item_map.get(transaction["transaction_id"])
+            if not item_data:
+                print(f"Warning: No item data found for modified transaction {transaction['transaction_id']}")
+                continue
+                
+            print(f"Modifying transaction: {transaction['transaction_id']}")
+
+            account_name = next(
+                (account["name"] for account in item_data.get("accounts", []) if account["account_id"] == transaction["account_id"]),
+                None
+            )
+            existing_query = db.collection("transactions").where("plaid_transaction_id", "==", transaction["transaction_id"]).where("user_id", "==", user_id)
+            existing_docs = existing_query.stream()
+            existing_doc = next(existing_docs, None)
+
+            if existing_doc:
+                print(f"Updating existing transaction with ID: {existing_doc.id}")
+                existing_doc.reference.update({
+                    "amount": -transaction["amount"] if transaction["amount"] > 0 else transaction["amount"],
+                    "name": transaction["name"],
+                    "date": transaction['date'].strftime("%Y-%m-%d")
+                })
+            else:
+                print(f"Creating new transaction for modified transaction: {transaction['transaction_id']}")
+                
+                # Create a validated transaction using our schema
+                transaction_schema = TransactionSchema(
+                    amount=-transaction["amount"],
+                    name=transaction["name"],
+                    date=transaction['date'].strftime("%Y-%m-%d"),
+                    user_id=user_id,
+                    plaid_transaction_id=transaction["transaction_id"],
+                    institution_name=item_data["institution_name"],
+                    account_name=account_name
+                )
+                
+                transaction_ref = db.collection("transactions").document()
+                transaction_ref.set(transaction_schema.to_dict())
+
+        # Process deleted transactions
+        print(f"Processing {len(deleted_transactions)} deleted transactions")
+        for transaction in deleted_transactions:
+            print(f"Deleting transaction: {transaction['transaction_id']}")
+            existing_query = db.collection("transactions").where("plaid_transaction_id", "==", transaction["transaction_id"]).where("user_id", "==", user_id)
+            existing_docs = existing_query.stream()
+
+            for doc in existing_docs:
+                print(f"Deleting transaction with ID: {doc.id}")
+                doc.reference.delete()
+
+        # Now that all transactions have been processed successfully, update the cursors
+        for item_id, cursor in cursor_updates.items():
+            print(f"Updating cursor for item {item_id} to {cursor}")
+            db.collection("plaid_items").document(item_id).update({"cursor": cursor})
+
+        print("Sync completed successfully")
+        return {"message": "Transactions synced successfully."}
+    except Exception as e:
+        print(f"Error during sync: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to sync transactions: {e}")

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from .db import db
+from backend.db.schemas import Category as CategorySchema
 
 router = APIRouter()
 
@@ -21,6 +22,10 @@ class CategoriesWithAllocatedRequest(BaseModel):
 
 class Category(BaseModel):
     name: str
+    user_id: str
+
+class DeleteCategoryRequest(BaseModel):
+    category_id: str
     user_id: str
 
 # Category Methods
@@ -83,7 +88,7 @@ async def get_categories_with_allocated(request: CategoriesWithAllocatedRequest)
         raise HTTPException(status_code=500, detail=f"Failed to get categories with allocated amounts: %e")
 
 @router.post("/get-allocated")
-async def get_categories_with_allocated(request: CategoriesWithAllocatedRequest):
+async def get_allocated(request: CategoriesWithAllocatedRequest):
     try:
         # logger.info("Fetching categories with allocated amounts for user_id: %s", request.user_id)
         
@@ -121,17 +126,60 @@ async def create_category(category: Category):
         if not user_doc.exists:
             raise HTTPException(status_code=404, detail="User not found")
 
+        # Create a validated category using our schema
+        category_data = CategorySchema(
+            name=category.name,
+            user_id=category.user_id,
+            available=0.0,
+            is_unallocated_funds=False
+        )
+        
         # logger.info("Creating a new category with name: %s", category.name)
         category_ref = db.collection("categories").document()
-        category_ref.set({
-            "name": category.name,
-            "user_id": category.user_id,
-            "available": 0.0,
-            "is_unallocated_funds": False,
-            "created_at": datetime.now(timezone.utc)
-        })
+        category_ref.set(category_data.to_dict())
+        
         # logger.info("Category created successfully with ID: %s", category_ref.id)
         return {"message": "Category created successfully.", "category_id": category_ref.id}
+    except ValueError as e:
+        # This will catch validation errors from the Pydantic model
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         # logger.error("Failed to create category: %s", e)
-        raise HTTPException(status_code=500, detail=f"Failed to create category: %e")
+        raise HTTPException(status_code=500, detail=f"Failed to create category: {str(e)}")
+
+@router.post("/delete-category")
+async def delete_category(request: DeleteCategoryRequest):
+    try:
+        # Verify the category exists and belongs to the user
+        category_ref = db.collection("categories").document(request.category_id)
+        category_doc = category_ref.get()
+        
+        if not category_doc.exists:
+            raise HTTPException(status_code=404, detail="Category not found")
+            
+        category_data = category_doc.to_dict()
+        if category_data.get("user_id") != request.user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to delete this category")
+        
+        # Check if any transactions use this category
+        transactions_query = db.collection("transactions").where("category_id", "==", request.category_id)
+        transactions = list(transactions_query.stream())
+        
+        if transactions:
+            raise HTTPException(status_code=400, detail="Cannot delete category with associated transactions")
+        
+        # Check if any assignments use this category
+        assignments_query = db.collection("assignments").where("category_id", "==", request.category_id)
+        assignments = list(assignments_query.stream())
+        
+        if assignments:
+            raise HTTPException(status_code=400, detail="Cannot delete category with associated assignments")
+        
+        # Delete the category
+        category_ref.delete()
+        return {"message": "Category deleted successfully"}
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete category: {str(e)}")

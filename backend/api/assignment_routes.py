@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from .db import db
+from backend.db.schemas import Assignment as AssignmentSchema
 
 router = APIRouter()
 
@@ -30,14 +31,17 @@ async def create_assignment(assignment: Assignment):
         if not category_doc.exists:
             raise HTTPException(status_code=404, detail="Category not found")
         
+        # Create a validated assignment using our schema
+        assignment_schema = AssignmentSchema(
+            amount=assignment.amount,
+            user_id=assignment.user_id,
+            category_id=assignment.category_id,
+            date=assignment.date
+        )
+        
+        # Convert to dict and save to Firestore
         assignment_ref = db.collection("assignments").document()
-        assignment_ref.set({
-            "amount": assignment.amount,
-            "user_id": assignment.user_id,
-            "category_id": assignment.category_id,
-            "date": assignment.date,
-            "created_at": datetime.now(timezone.utc)
-        })
+        assignment_ref.set(assignment_schema.to_dict())
 
         unallocated_query = db.collection("categories").where("user_id", "==", assignment.user_id).where("is_unallocated_funds", "==", True).limit(1)
         unallocated_docs = unallocated_query.stream()
