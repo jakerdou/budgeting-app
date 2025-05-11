@@ -20,7 +20,7 @@ const BudgetPeriod: React.FC<BudgetPeriodProps> = ({ budgetPeriod, setBudgetPeri
   return (
     <View>
     {/* <View style={styles.container}> */}
-      <Text>Budget Period</Text>
+      <Text>Pay Period</Text>
       <Picker
         selectedValue={budgetPeriod}
         style={styles.picker}
@@ -33,7 +33,7 @@ const BudgetPeriod: React.FC<BudgetPeriodProps> = ({ budgetPeriod, setBudgetPeri
           }
         }}
       >
-        <Picker.Item label="Select Budget Period" value="" />
+        <Picker.Item label="Select Your Pay Period" value="" />
         <Picker.Item label="Monthly" value="Monthly" />
         <Picker.Item label="Every Other Week" value="Every Other Week" />
       </Picker>

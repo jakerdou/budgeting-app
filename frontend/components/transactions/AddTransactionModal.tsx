@@ -28,13 +28,26 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onCl
   }, [categories]); // Runs whenever `categories` changes
 
   const handleAddTransaction = async () => {
+    if (!name || !amount || !category) {
+      alert('Please fill in all fields');
+      return;
+    }
+    if (isNaN(parseFloat(amount))) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    if (parseFloat(amount) <= 0) {
+      alert('Amount must be greater than zero');
+      return;
+    }
+
     const categoryId = categories.find((cat) => cat.name === category)?.id || '';
     const adjustedAmount = isIncome ? parseFloat(amount) : -1 * parseFloat(amount);
     const data = await addTransaction(user.uid, adjustedAmount, categoryId, name, date.toISOString().split('T')[0] );
     const newTransaction = {
       amount: adjustedAmount,
       category_id: categoryId,
-      date: date.toISOString(),
+      date: date.toISOString().split('T')[0],
       name,
       type: adjustedAmount < 0 ? 'debit' : 'credit',
       user_id: user.uid,

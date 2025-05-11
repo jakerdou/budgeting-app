@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Button, ActivityIndicator, StyleSheet } from 'react-native';
 import { usePlaidLink } from 'react-plaid-link';
 import { getLinkTokenFromAsyncStorage, saveLinkTokenToAsyncStorage } from '@/utils/plaidUtils'; // Import modified functions
-import { getLinkToken } from '@/services/plaid';
+import { getLinkToken, exchangePublicToken } from '@/services/plaid';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import { useAuth } from '@/context/AuthProvider';
 
 const BankLinkButton: React.FC = () => {
+  const { user } = useAuth();
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -34,10 +36,16 @@ const BankLinkButton: React.FC = () => {
     fetchLinkToken();
   }, [linkToken]);
 
-  const onSuccess = (public_token: string, metadata: any) => {
+  const onSuccess = async (public_token: string, metadata: any) => {
     console.log('Successfully linked the account:', metadata, 'public token:', public_token);
     // call endpoint to get access token from public token, 
     // then call endpoint (separate endpoint, pass in access token and account metadata) to save linked accounts to database
+    const filteredAccounts = metadata.accounts.map((account: any) => ({
+      account_id: account.id,
+      name: account.name,
+      type: account.type,
+    }));
+    await exchangePublicToken(public_token, user?.uid || '', filteredAccounts, metadata.institution.name);
   };
 
   console.log('token:', linkToken);

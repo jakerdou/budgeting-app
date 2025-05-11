@@ -22,8 +22,6 @@ const DatePickers: React.FC<DatePickersProps> = ({ startDate, endDate, setStartD
     budgetPeriods.push('Pay Period');
   }
 
-  console.log('preferences', preferences);
-
   const budgetPeriodsMapping: { [key: string]: string } = {
     'app-yearly': 'Yearly',
     'app-monthly': 'Monthly',
@@ -41,8 +39,6 @@ const DatePickers: React.FC<DatePickersProps> = ({ startDate, endDate, setStartD
     return `${month}-${day}-${year}`;
   };
 
-  console.log('budgetPeriod', budgetPeriodsMapping[budgetPeriod]);
-
   return (
     <View>
       <View style={styles.budgetPeriodContainer}>
@@ -53,9 +49,11 @@ const DatePickers: React.FC<DatePickersProps> = ({ startDate, endDate, setStartD
             selectedOption={budgetPeriodsMapping[budgetPeriod]}
             onSelect={(itemValue) => {
               if (itemValue === 'Yearly') {
-                setBudgetPeriod('app-yearly');
+                setBudgetPeriod('yearly');
+                // setBudgetPeriod('app-yearly');
               } else if (itemValue === 'Monthly') {
-                setBudgetPeriod('app-monthly');
+                setBudgetPeriod('monthly');
+                // setBudgetPeriod('app-monthly');
               } else if (itemValue === 'Pay Period') {
                 setBudgetPeriod(preferences?.budget_period);
               }
@@ -68,9 +66,11 @@ const DatePickers: React.FC<DatePickersProps> = ({ startDate, endDate, setStartD
             onValueChange={(itemValue) => {
               console.log('itemValue', itemValue);
               if (itemValue === 'Yearly') {
-                setBudgetPeriod('app-yearly');
+                setBudgetPeriod('yearly');
+                // setBudgetPeriod('app-yearly');
               } else if (itemValue === 'Monthly') {
-                setBudgetPeriod('app-monthly');
+                setBudgetPeriod('monthly');
+                // setBudgetPeriod('app-monthly');
               } else if (itemValue === 'Pay Period') {
                 setBudgetPeriod(preferences?.budget_period);
               }

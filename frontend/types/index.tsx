@@ -14,3 +14,20 @@ export type Transaction = {
     type: string;
     user_id: string;
 };
+
+type Account = {
+    account_id: string;
+    name: string;
+    type: string;
+}
+
+// Type definition for Plaid items
+export type PlaidItem = {
+    id: string; // Assuming 'id' is mapped to 'account_id'
+    access_token: string; // Assuming 'access_token' is a string
+    accounts: Account[]; // Assuming 'accounts' is an array of Account objects
+    created_at: Date; // Timestamp as a string
+    cursor: string;
+    institution_name: string;
+    user_id: string;
+};

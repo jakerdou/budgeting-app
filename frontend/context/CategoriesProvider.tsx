@@ -9,12 +9,14 @@ type Category = {
   name: string;
   allocated: number;
   available: number;
+  is_unallocated_funds?: boolean;
   // add other category fields if needed
 };
 
 type CategoriesContextType = {
   categories: Category[];
   loading: boolean;
+  unallocatedFunds: Category | null;
 };
 
 const CategoriesContext = createContext<CategoriesContextType | undefined>(undefined);
@@ -23,6 +25,7 @@ export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unallocatedFunds, setUnallocatedFunds] = useState<Category | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -39,9 +42,14 @@ export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         id: doc.id,
         ...doc.data(),
       } as Category));
-      console.log('fetched Categories');
-
+      
+      console.log('Fetched categories:', fetchedCategories);
       setCategories(fetchedCategories);
+      
+      // Find the unallocated funds category
+      const unallocated = fetchedCategories.find(category => category.is_unallocated_funds) || null;
+      setUnallocatedFunds(unallocated);
+      
       setLoading(false);
     });
 
@@ -50,7 +58,7 @@ export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [user]);
 
   return (
-    <CategoriesContext.Provider value={{ categories, loading }}>
+    <CategoriesContext.Provider value={{ categories, loading, unallocatedFunds }}>
       {children}
     </CategoriesContext.Provider>
   );

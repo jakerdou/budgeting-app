@@ -61,3 +61,24 @@ export const addCategory = async (userId: string, newCategoryName: string) => {
     return data;
 
 };
+
+export const deleteCategory = async (userId: string, categoryId: string) => {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_CATEGORY_PREFIX}/delete-category`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            category_id: categoryId,
+        }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to delete category');
+    }
+
+    const data = await response.json();
+    return data;
+};

@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, SafeAreaView, Text, StyleSheet, FlatList, Button, TouchableOpacity } from 'react-native';
+import { View, SafeAreaView, Text, StyleSheet, FlatList, Button, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useAuth } from '@/context/AuthProvider';
 import { useCategories } from '@/context/CategoriesProvider';
 import AddCategoryModal from '@/components/budget/AddCategoryModal';
 import AssignmentModal from '@/components/budget/AssignmentModal';
 import BudgetTabHeader from '@/components/budget/BudgetTabHeader';
-import { getAllocated } from '@/services/categories';
+import { getAllocated, deleteCategory } from '@/services/categories';
 import { Category } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
 import {
   setMonthlyDates,
   setBiWeeklyDates,
@@ -17,9 +18,8 @@ import {
 
 export default function Tab() {
   const { user } = useAuth();
-  const { categories, loading } = useCategories();
+  const { categories, loading, unallocatedFunds } = useCategories();
   const [allocated, setAllocated] = useState<any[]>([]);
-  const [unallocatedFunds, setUnallocatedFunds] = useState<Category | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
@@ -41,14 +41,11 @@ export default function Tab() {
       try {
         const data = await getAllocated(user.uid, startDate, endDate);
         setAllocated(data.allocated);
-
-        const unallocated = categories.find((category: any) => category.is_unallocated_funds) || null;
-        setUnallocatedFunds(unallocated);
       } catch (error) {
         console.error('Failed to fetch allocated data', error);
       }
     }
-  }, [user, startDate, endDate, categories]);
+  }, [user, startDate, endDate]);
 
   useEffect(() => {
     fetchAllocated();
@@ -59,18 +56,73 @@ export default function Tab() {
     return allocation ? allocation.allocated : 0;
   };
 
+  const handleDeleteCategory = async (category: Category) => {
+    if (!user) return;
+
+    if (Platform.OS === 'web') {
+      const confirmDelete = window.confirm(`Are you sure you want to delete "${category.name}"?`);
+      if (confirmDelete) {
+        try {
+          await deleteCategory(user.uid, category.id);
+          fetchAllocated();
+        } catch (error: any) {
+          window.alert(error.message || "Cannot delete category. It may have transactions or assignments associated with it.");
+        }
+      }
+    } else {
+      Alert.alert(
+        "Delete Category",
+        `Are you sure you want to delete "${category.name}"?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await deleteCategory(user.uid, category.id);
+                fetchAllocated();
+              } catch (error: any) {
+                Alert.alert(
+                  "Cannot Delete Category",
+                  error.message || "This category may have transactions or assignments associated with it."
+                );
+              }
+            }
+          }
+        ]
+      );
+    }
+  };
+
   const renderItem = ({ item }: { item: Category }) => {
     const allocatedAmount = getAllocatedAmount(item.id);
     return (
-      <TouchableOpacity onPress={() => setSelectedCategory(item)}>
-        <View style={styles.item}>
+      <View style={styles.item}>
+        <TouchableOpacity
+          style={styles.categoryContent}
+          onPress={() => setSelectedCategory(item)}
+        >
           <Text style={styles.name}>{item.name}</Text>
           <View style={styles.valuesContainer}>
             <Text style={styles.value}>Allocated: ${allocatedAmount.toFixed(2)}</Text>
             <Text style={styles.value}>Available: ${item.available.toFixed(2)}</Text>
           </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.deleteButton, Platform.OS === 'web' && styles.webDeleteButton]}
+          onPress={() => handleDeleteCategory(item)}
+          role="button"
+          aria-label={`Delete ${item.name} category`}
+        >
+          <Ionicons 
+            name="trash-outline" 
+            size={24} 
+            color="red" 
+            accessibilityLabel="Delete"
+          />
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -97,18 +149,16 @@ export default function Tab() {
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-          ListFooterComponent={
-            <View style={styles.footer}>
-              <Button title="Add Category" onPress={() => setModalVisible(true)} />
-            </View>
-          }
         />
       )}
+      <View style={styles.footer}>
+        <Button title="Add Category" onPress={() => setModalVisible(true)} />
+      </View>
       <AddCategoryModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         userId={user?.uid}
-        onNewCategory={() => fetchAllocated()} // Refresh categories after adding
+        onNewCategory={() => fetchAllocated()}
       />
       <AssignmentModal
         visible={!!selectedCategory}
@@ -136,6 +186,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  categoryContent: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   name: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -148,6 +204,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginHorizontal: 8,
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 10,
+  },
+  webDeleteButton: {
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   footer: {
     padding: 16,

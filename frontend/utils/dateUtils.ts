@@ -3,15 +3,8 @@
 import { startOfMonth, endOfMonth, subDays, subMonths, subYears, addDays, addMonths, addYears, startOfDay, startOfYear, endOfYear } from 'date-fns';
 
 export const setMonthlyDates = (setStartDate: (date: Date) => void, setEndDate: (date: Date) => void) => {
-  // const startOfMonthUTC = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1, 0, 0, 0));
-  // const endOfMonthUTC = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 0, 23, 59, 59));
-  // console.log('setMonthlyDates', startOfMonthUTC, endOfMonthUTC);
-
-  // setStartDate(startOfMonthUTC);
-  // setEndDate(endOfMonthUTC);
   setStartDate(startOfMonth(new Date()));
   setEndDate(endOfMonth(new Date()));
-  // console.log('setMonthlyDates', startOfMonth(new Date()), endOfMonth(new Date()));
 };
 
 

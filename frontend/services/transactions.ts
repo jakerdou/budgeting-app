@@ -18,7 +18,7 @@ export const getTransactions = async (userId: string) => {
     return data;
 };
 
-export const addTransaction = async (userId: string, amount: number, categoryId: string, name: string, date: string) => {
+export const addTransaction = async (userId: string, amount: number, categoryId: string, name: string, date: string) => {  
     const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/create-transaction`, {
         method: 'POST',
         headers: {
@@ -76,6 +76,23 @@ export const updateTransactionCategory = async (userId: string, transactionId: s
 
     if (!response.ok) {
         throw new Error('Failed to update transaction category');
+    }
+
+    const data = await response.json();
+    return data;
+};
+
+export const syncPlaidTransactions = async (userId: string) => {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/sync-plaid-transactions`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: userId }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to sync transactions');
     }
 
     const data = await response.json();

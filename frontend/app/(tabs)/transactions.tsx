@@ -4,24 +4,50 @@ import { useAuth } from '@/context/AuthProvider';
 import { useCategories } from '@/context/CategoriesProvider';
 import AddTransactionModal from '@/components/transactions/AddTransactionModal';
 import TransactionsTabHeader from '@/components/transactions/TransactionsTabHeader';
-import { getTransactions, addTransaction, deleteTransaction, updateTransactionCategory } from '@/services/transactions';
+import { getTransactions, addTransaction, deleteTransaction, updateTransactionCategory, syncPlaidTransactions } from '@/services/transactions';
 import { Transaction } from '@/types';
 import { MaterialIcons } from '@expo/vector-icons';
-// import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Tab() {
   const { user } = useAuth();
   const { categories } = useCategories();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const fetchTransactions = async () => {
     if (user) {
       try {
+        setIsLoading(true);
         const data = await getTransactions(user.uid);
         setTransactions(data.transactions);
       } catch (error) {
         console.error('Failed to fetch transactions', error);
+        Alert.alert('Error', 'Failed to load transactions');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const fetchNewTransactions = async () => {
+    if (user) {
+      try {
+        setIsLoading(true);
+        const data = await syncPlaidTransactions(user.uid);
+        console.log('Fetched new transactions:', data);
+        if (data) {
+          fetchTransactions(); // Refresh the transactions list after syncing
+          Alert.alert('Success', `transactions synced`);
+        } else {
+          console.log('No new transactions found');
+          Alert.alert('Info', 'No new transactions found');
+        }
+      } catch (error) {
+        console.error('Failed to sync transactions', error);
+        Alert.alert('Error', 'Failed to sync transactions');
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -147,11 +173,21 @@ export default function Tab() {
   return (
     <SafeAreaView style={styles.container}>
       <TransactionsTabHeader onAddTransactionPress={() => setModalVisible(true)} />
+      <TouchableOpacity 
+        style={[styles.syncButton, isLoading && styles.syncButtonDisabled]} 
+        onPress={fetchNewTransactions}
+        disabled={isLoading}
+      >
+        <Text style={styles.syncButtonText}>
+          {isLoading ? 'Syncing...' : 'Sync Transactions'}
+        </Text>
+      </TouchableOpacity>
       <FlatList
         data={transactions}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={<Text style={styles.sectionHeader}>Transactions</Text>}
       />
       <AddTransactionModal
         visible={modalVisible}
@@ -193,5 +229,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginHorizontal: 8,
+  },
+  sectionHeader: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginVertical: 8,
+  },
+  syncButton: {
+    backgroundColor: '#007BFF',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    margin: 10,
+  },
+  syncButtonDisabled: {
+    backgroundColor: '#cccccc',
+  },
+  syncButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
