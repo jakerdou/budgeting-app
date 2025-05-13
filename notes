@@ -1,68 +1,41 @@
-Fixes:
-    make budget period change when dropdown is changed on budget page
-
 to make mvp:
-    maybe forget plaid and use pnc and amex APIs
-        https://developer.pnc.com/documentation/products/Information-Reporting/4/overview?linkRef=documentation
+    resolve tech debt
+        1- create db schema file, make sure that objects created are of this schema
+            user, category, transaction, plaid item, assignments
 
-    fix change transaction category on ios
+    make ui a bit better
+        2 - create wireframes
+        3 - enact change >:)
 
-    make monthly next and previous function correctly
-
-    be able to delete categories when no transactions correspond to them
-
-    integrate with plaid
-    add fetch transactions button that will fetch from plaid
-
-    add account object to db and methods to fetch/create
-
-    add endpoint to call after successfully linking bank accounts through plaid that will:
-        save account id, name, user id and stuff to account object
-        save public token to user object
-    if user has public token, make a call to fetch their transactions when the app is opened maybe, look into how to do this, maybe have fetch transactions button
-
-    add place in app to unlink accounts and remove them from db
-
-    update object diagram in draw.io that will show the variables necessary for the account object and the updates to the user object (just public key I think)
-
-
-    there's an issue with plaid link on ios, look at homepage file from tiny quickstart and compare them to see if there's any issue
+    make it so that when we add a transaction manually it automatically shows up
+    
+    make it so that when we add an assignment it automatically shows up
 
 
 less important
-    go through index.tsx and datepickers and rename variables maybe to make it less confusing, different things are called budtet period and pay period
+    go through index.tsx and datepickers and rename variables maybe to make it less confusing, different things are called budget period and pay period
+
+    make it so that users can't sign up if the create-user endpoint returns an error
+
+    move db.py to backend db folder
+
+    there's an issue with plaid link on ios, look at homepage file from tiny quickstart and compare them to see if there's any issue
+
+    figure out why categories sometimes comes back empty - i think i did it (or at least fixed it idk why it was happening)
+
+    right now we get categories in the frontend in the categories provider, then we call the endpoint to get allocated backend endpoint and then pair them in the frontend, maybe just get categories as a whole form the backend, idk
 
     maybe make frontend display amount of unallocated funds you have from the current budget period (basically the sum of the transactions assigned to unallocated funds category for that period of time)
-
-    figure out why categories sometimes comes back empty
 
     make add transaction button a plus icon
 
     add color stylings
 
-    have unified format date function
-
     handle case where start date is after current date
 
-    make transaction category a dropdown button that changes the category
+    rename top level api folder
 
-    make times consistent across app and database
-        put timezone in user preferences
-
-        save as midnight local time (according to user.preferences.time_zone)
-            pay period start date
-            manually added transaction date
-
-        display as local time
-            date pickers in budget page
-            date in transaction page
-            start date in preferences page
-
-        make sure that set start/end date and set next/prev start/end date functions are all using timezone user preference
-
-        rename top level api folder
-
-        get monthly budget period preference to work, budget period dropdown is messed up when budget period is monthly and pay_schedule is null or when we go from bi-weekly to monthly in budget period preferences and go back to budget page
+    show no transactions message when there are none
 
 
 
