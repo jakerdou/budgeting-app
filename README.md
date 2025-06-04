@@ -24,6 +24,7 @@ The project consists of two main parts:
    python -m venv api-venv
    
    # On Windows
+   Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
    .\api-venv\Scripts\activate
    
    # On macOS/Linux

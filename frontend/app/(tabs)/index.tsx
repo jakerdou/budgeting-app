@@ -159,12 +159,13 @@ export default function Tab() {
         onClose={() => setModalVisible(false)}
         userId={user?.uid}
         onNewCategory={() => fetchAllocated()}
-      />
+      />      
       <AssignmentModal
         visible={!!selectedCategory}
         onClose={() => setSelectedCategory(null)}
         category={selectedCategory}
         userId={user?.uid || ''}
+        onAssignmentCreated={fetchAllocated}
       />
     </SafeAreaView>
   );

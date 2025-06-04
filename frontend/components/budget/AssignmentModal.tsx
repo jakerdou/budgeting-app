@@ -9,10 +9,10 @@ type AssignmentModalProps = {
   onClose: () => void;
   category: { id: string; name: string; allocated: number; available: number } | null;
   userId: string;
-  // fetchCategories: () => void;
+  onAssignmentCreated?: () => void;
 };
 
-const AssignmentModal: React.FC<AssignmentModalProps> = ({ visible, onClose, category, userId }) => {
+const AssignmentModal: React.FC<AssignmentModalProps> = ({ visible, onClose, category, userId, onAssignmentCreated }) => {
   const [amount, setAmount] = useState('');
   const inputRef = useRef<TextInput>(null);
 
@@ -22,7 +22,6 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ visible, onClose, cat
       inputRef.current?.focus();
     }
   }, [visible]);
-
   const handleSubmit = async () => {
     if (!category) return;
 
@@ -36,7 +35,9 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ visible, onClose, cat
     try {
       await createAssignment(assignment);
       setAmount('');
-      // fetchCategories();
+      if (onAssignmentCreated) {
+        onAssignmentCreated();
+      }
       onClose();
     } catch (error) {
       console.error('Error creating assignment', error);

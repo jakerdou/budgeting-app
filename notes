@@ -1,15 +1,7 @@
 to make mvp:
-    resolve tech debt
-        1- create db schema file, make sure that objects created are of this schema
-            user, category, transaction, plaid item, assignments
-
     make ui a bit better
         2 - create wireframes
         3 - enact change >:)
-
-    make it so that when we add a transaction manually it automatically shows up
-    
-    make it so that when we add an assignment it automatically shows up
 
 
 less important

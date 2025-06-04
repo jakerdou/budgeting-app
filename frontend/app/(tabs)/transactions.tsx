@@ -166,8 +166,10 @@ export default function Tab() {
     );
   };
 
-  const handleAddTransaction = (transaction: Transaction) => {
-    setTransactions([...transactions, transaction]);
+  const handleAddTransaction = async (transaction: Transaction) => {
+    // Instead of just adding the transaction to the state,
+    // let's fetch all transactions to ensure consistency with backend
+    fetchTransactions();
   };
 
   return (
