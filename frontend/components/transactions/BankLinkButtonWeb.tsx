@@ -48,7 +48,7 @@ const BankLinkButton: React.FC = () => {
     await exchangePublicToken(public_token, user?.uid || '', filteredAccounts, metadata.institution.name);
   };
 
-  console.log('token:', linkToken);
+  // console.log('token:', linkToken);
   const { open, ready, error } = usePlaidLink({
     token: linkToken || '',
     onSuccess,
@@ -61,47 +61,39 @@ const BankLinkButton: React.FC = () => {
     },
   });
 
-  console.log('ready:', ready, 'error:', error);
-
+  // console.log('ready:', ready, 'error:', error);
   return (
     <View style={styles.container}>
       {loading ? (
         <ActivityIndicator size="large" color="#0000ff" />
       ) : linkToken ? (
-        <View style={styles.card}>
-          <Text style={styles.title}>Link Your Bank Account</Text>
-          <Text style={styles.description}>Click below to link your bank account with Plaid.</Text>
-          <Button
-            title="Link Account"
-            onPress={() => open()}
-            disabled={!ready}
-            color="#007bff"
-          />
-          {error && <Text style={styles.error}>Error: {error.message}</Text>}
-        </View>
+        <Button
+          title="Link Account"
+          onPress={() => open()}
+          disabled={!ready}
+          color="#007bff"
+        />
       ) : (
-        <Text style={styles.loadingText}>Loading Plaid link token...</Text>
+        <ActivityIndicator size="large" color="#0000ff" />
       )}
+      {error && <Text style={styles.error}>Error: {error.message}</Text>}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    padding: 16,
+    padding: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    maxWidth: 300,
+    alignSelf: 'center',
   },
   card: {
-    width: '100%',
-    padding: 16,
+    width: 'auto',
+    padding: 12,
     backgroundColor: '#fff',
     borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     alignItems: 'center',
   },
   title: {

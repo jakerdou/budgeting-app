@@ -179,25 +179,33 @@ async def update_transaction_category(request: UpdateTransactionCategoryRequest)
             raise HTTPException(status_code=404, detail="Old category not found")
         
         old_category_data = old_category_doc.to_dict() if old_category_doc else None
-        print(f"Old category data: {old_category_data}")
-        
-        new_category_ref = db.collection("categories").document(request.category_id)
-        new_category_doc = new_category_ref.get() if callable(new_category_ref.get) else None
-        
-        if not new_category_doc or not new_category_doc.exists:
-            print(f"New category with ID {request.category_id} not found.")
-            raise HTTPException(status_code=404, detail="New category not found")
-        
-        new_category_data = new_category_doc.to_dict()
-        print(f"New category data: {new_category_data}")
-        
-        if new_category_data["user_id"] != request.user_id:
-            print(f"New category user ID mismatch: {new_category_data['user_id']} != {request.user_id}")
-            raise HTTPException(status_code=403, detail="New category does not belong to the user")
-        
-        # Update the transaction's category_id
-        print(f"Updating transaction {request.transaction_id} to new category {request.category_id}")
-        transaction_ref.update({"category_id": request.category_id})
+        print(f"Old category data: {old_category_data}")        
+        # Handle setting category to null/None
+        if request.category_id == "null" or request.category_id is None:
+            print(f"Setting transaction {request.transaction_id} to have no category")
+            new_category_data = None
+            new_category_ref = None
+        else:
+            new_category_ref = db.collection("categories").document(request.category_id)
+            new_category_doc = new_category_ref.get() if callable(new_category_ref.get) else None
+            
+            if not new_category_doc or not new_category_doc.exists:
+                print(f"New category with ID {request.category_id} not found.")
+                raise HTTPException(status_code=404, detail="New category not found")
+            
+            new_category_data = new_category_doc.to_dict()
+            print(f"New category data: {new_category_data}")
+            
+            if new_category_data["user_id"] != request.user_id:
+                print(f"New category user ID mismatch: {new_category_data['user_id']} != {request.user_id}")
+                raise HTTPException(status_code=403, detail="New category does not belong to the user")
+          # Update the transaction's category_id
+        if request.category_id == "null" or request.category_id is None:
+            print(f"Setting transaction {request.transaction_id} to have no category (null)")
+            transaction_ref.update({"category_id": None})
+        else:
+            print(f"Updating transaction {request.transaction_id} to new category {request.category_id}")
+            transaction_ref.update({"category_id": request.category_id})
 
         # Adjust the available amounts in the old and new categories
         transaction_amount = transaction_data["amount"]
@@ -211,10 +219,14 @@ async def update_transaction_category(request: UpdateTransactionCategoryRequest)
         else:
             print("No old category to update (transaction was uncategorized).")
         
-        print(f"New category available before update: {new_category_data.get('available', 0.0)}")
-        new_new_available = new_category_data.get("available", 0.0) + transaction_amount
-        new_category_ref.update({"available": new_new_available})
-        print(f"Updated new category available amount to {new_new_available}")
+        # Only update the new category if it's not null
+        if new_category_data:
+            print(f"New category available before update: {new_category_data.get('available', 0.0)}")
+            new_new_available = new_category_data.get("available", 0.0) + transaction_amount
+            new_category_ref.update({"available": new_new_available})
+            print(f"Updated new category available amount to {new_new_available}")
+        else:
+            print("Transaction set to have no category - no new category to update")
         
         print(f"Transaction category updated successfully for transaction_id: {request.transaction_id}")
         return {"message": "Transaction category updated successfully.", "transaction_id": request.transaction_id}

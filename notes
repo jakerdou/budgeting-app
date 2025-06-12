@@ -3,6 +3,8 @@ to make mvp:
         2 - create wireframes
         3 - enact change >:)
 
+    change allocations date so it's just a string like transaction. allocations aren't showing up correctly. We're basically skipping the last day.
+
 
 less important
     go through index.tsx and datepickers and rename variables maybe to make it less confusing, different things are called budget period and pay period

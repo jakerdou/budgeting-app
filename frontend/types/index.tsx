@@ -8,7 +8,7 @@ export type Category = {
 export type Transaction = {
     id: string;
     amount: number;
-    category_id: string;
+    category_id: string | null;
     date: string
     name: string;
     type: string;
