@@ -29,17 +29,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userSnap = await getDoc(userRef);
           let preferences = userSnap.exists() ? userSnap.data().preferences : {};
 
-          // Convert start_date to ISO string
-          if (preferences.pay_schedule?.start_date) {
-            preferences = {
-              ...preferences,
-              pay_schedule: {
-                ...preferences.pay_schedule,
-                start_date: new Date(preferences.pay_schedule.start_date.seconds * 1000).toISOString(),
-              },
-            };
-          }
-
           setUser({
             email: firebaseUser.email!,
             uid: firebaseUser.uid,

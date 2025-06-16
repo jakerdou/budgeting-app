@@ -9,7 +9,7 @@ class Assignment(FirestoreModel):
     amount: float
     user_id: str
     category_id: str
-    date: datetime
+    date: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     @classmethod

@@ -363,10 +363,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginHorizontal: 8,
-  },  sectionHeader: {
+    textAlign: 'right',
+    minWidth: 60, // Ensure enough space for values
+  },  
+  sectionHeader: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginVertical: 8,  },
+    marginVertical: 8,  
+  },
   categoryContainer: {
     position: 'relative',
     minWidth: 120,

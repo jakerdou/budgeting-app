@@ -1,10 +1,20 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from .db import db
 from backend.db.schemas import Category as CategorySchema
 
 router = APIRouter()
+
+# Helper function to get the next day for date range queries
+def get_next_day_str(date_str: str) -> str:
+    """
+    Takes a date string in YYYY-MM-DD format and returns the next day
+    in the same format, to be used for inclusive querying of the end date
+    """
+    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+    next_day = date_obj + timedelta(days=1)
+    return next_day.strftime("%Y-%m-%d")
 
 # Models
 class User(BaseModel):
@@ -17,8 +27,8 @@ class UserIDRequest(BaseModel):
 
 class CategoriesWithAllocatedRequest(BaseModel):
     user_id: str
-    start_date: datetime
-    end_date: datetime
+    start_date: str
+    end_date: str
 
 class Category(BaseModel):
     name: str
@@ -73,10 +83,13 @@ async def get_categories_with_allocated(request: CategoriesWithAllocatedRequest)
             category_data["id"] = doc.id  # Add the category ID to the response
             
             # Calculate allocated amount for the category
-            assignments_query = db.collection("assignments").where("category_id", "==", doc.id).where("date", ">=", request.start_date).where("date", "<=", request.end_date)
+            # Using helper function to get the next day for inclusive end date
+            next_day_str = get_next_day_str(request.end_date)
+            assignments_query = db.collection("assignments").where("category_id", "==", doc.id).where("date", ">=", request.start_date).where("date", "<", next_day_str)
             assignments_docs = assignments_query.stream()
             print(f"Assignments query for category {doc.id}: {assignments_query}")
             print(f"Assignments query results: {assignments_docs}")
+            print(f"Using date range: {request.start_date} to {request.end_date} (exclusive upper bound: {next_day_str})")
             allocated_amount = sum(assignment.to_dict().get("amount", 0.0) for assignment in assignments_docs)
             
             category_data["allocated"] = allocated_amount
@@ -91,11 +104,10 @@ async def get_categories_with_allocated(request: CategoriesWithAllocatedRequest)
 
 @router.post("/get-allocated")
 async def get_allocated(request: CategoriesWithAllocatedRequest):
-    try:
-        # Debug request information
+    try:        # Debug request information
         print(f"DEBUG - get-allocated called with user_id: {request.user_id}")
-        print(f"DEBUG - Start date: {request.start_date.isoformat()}")
-        print(f"DEBUG - End date: {request.end_date.isoformat()}")
+        print(f"DEBUG - Start date: {request.start_date}")
+        print(f"DEBUG - End date: {request.end_date}")
         
         # Query categories with a `user_id` field equal to `request.user_id`
         categories_query = db.collection("categories").where("user_id", "==", request.user_id)
@@ -117,8 +129,10 @@ async def get_allocated(request: CategoriesWithAllocatedRequest):
             allocated_data["category_id"] = doc.id  # Add the category ID to the response
             
             # Calculate allocated amount for the category
-            assignments_query = db.collection("assignments").where("category_id", "==", doc.id).where("date", ">=", request.start_date).where("date", "<=", request.end_date)
-            # print(f"DEBUG - Assignments query for category {doc.id}: {assignments_query._query.to_dict()}")
+            # Using helper function to get the next day for inclusive end date
+            next_day_str = get_next_day_str(request.end_date)
+            assignments_query = db.collection("assignments").where("category_id", "==", doc.id).where("date", ">=", request.start_date).where("date", "<", next_day_str)
+            print(f"DEBUG - Using date range: {request.start_date} to {request.end_date} (exclusive upper bound: {next_day_str})")
 
             # Try to catch any issues with the stream operation
             try:

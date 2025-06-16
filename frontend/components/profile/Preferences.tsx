@@ -21,9 +21,8 @@ const Preferences: React.FC<PreferencesProps> = ({ userId, preferences }) => {
   );
 
   const [budgetPeriod, setBudgetPeriod] = useState(reverseBudgetPeriodMapping[preferences?.budget_period] || '');
-  const [startDate, setStartDate] = useState(preferences?.pay_schedule?.start_date ? new Date(preferences.pay_schedule.start_date) : new Date());
-
-  // console.log('Preferences', preferences, budgetPeriod, startDate);
+  
+  const [startDate, setStartDate] = useState(preferences?.pay_schedule?.start_date ? preferences.pay_schedule.start_date : null);
 
   const { updateUserPreferences } = useAuth(); // Get updateUserPreferences from context
 
@@ -35,7 +34,7 @@ const Preferences: React.FC<PreferencesProps> = ({ userId, preferences }) => {
     }
   };
 
-  const handleSubmit = async () => {
+    const handleSubmit = async () => {
     if (budgetPeriod === '' || (budgetPeriod === 'Every Other Week' && !startDate)) {
       showAlert('Error', 'Please fill out all fields');
       return;
@@ -46,7 +45,7 @@ const Preferences: React.FC<PreferencesProps> = ({ userId, preferences }) => {
     try {
       const updatedPreferences = {
         budget_period: apiBudgetPeriod,
-        pay_schedule: { start_date: startDate.toISOString().split('T')[0] }
+        pay_schedule: { start_date: startDate }
       };
       await updatePreferences(
         userId || '', 

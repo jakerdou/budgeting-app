@@ -10,7 +10,7 @@ class Assignment(BaseModel):
     amount: float
     user_id: str
     category_id: str
-    date: datetime
+    date: str
 
 @router.post("/create-assignment")
 async def create_assignment(assignment: Assignment):

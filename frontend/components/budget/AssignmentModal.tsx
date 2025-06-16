@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Button, TextInput, StyleSheet } from 'react-native';
 import Modal from 'react-native-modal'; // Importing react-native-modal
 import { createAssignment } from '@/services/assignments'; // Importing the createAssignment function from the API
+import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
 
 
 type AssignmentModalProps = {
@@ -29,7 +30,7 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ visible, onClose, cat
       amount: parseFloat(amount),
       user_id: userId,
       category_id: category.id,
-      date: new Date().toISOString(),
+      date: formatDateToYYYYMMDD(new Date()),
     };
 
     try {

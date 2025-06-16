@@ -9,7 +9,7 @@ class PaySchedule(BaseModel):
         "extra": "forbid"
     }
     
-    start_date: datetime
+    start_date: str
 
 class UserPreferences(BaseModel):
     # Configure model to forbid extra fields

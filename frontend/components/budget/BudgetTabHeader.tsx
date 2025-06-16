@@ -4,15 +4,15 @@ import DatePickers from '@/components/budget/DatePickers';
 import { Category } from '@/types';
 
 interface BudgetTabHeaderProps {
-  startDate: Date;
-  endDate: Date;
-  setStartDate: (date: Date) => void;
-  setEndDate: (date: Date) => void;
+  startDate: string;
+  endDate: string;
+  setStartDate: (date: string) => void;
+  setEndDate: (date: string) => void;
   userPreferences: any;
   setBudgetPeriod: (period: string) => void;
   budgetPeriod: string;
-  setPreviousBudgetPeriodTimeFrame: (budgetPeriod: string, currentStartDate: Date, currentEndDate: Date, setStartDate: (date: Date) => void, setEndDate: (date: Date) => void) => void;
-  setNextBudgetPeriodTimeFrame: (budgetPeriod: string, currentStartDate: Date, currentEndDate: Date, setStartDate: (date: Date) => void, setEndDate: (date: Date) => void) => void;
+  setPreviousBudgetPeriodTimeFrame: (budgetPeriod: string, currentStartDate: string, currentEndDate: string, setStartDate: (date: string) => void, setEndDate: (date: string) => void) => void;
+  setNextBudgetPeriodTimeFrame: (budgetPeriod: string, currentStartDate: string, currentEndDate: string, setStartDate: (date: string) => void, setEndDate: (date: string) => void) => void;
   unallocatedFunds: Category | null;
 }
 

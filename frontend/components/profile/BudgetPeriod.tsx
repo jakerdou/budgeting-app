@@ -2,20 +2,17 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
 
-type BudgetPeriodProps = {
-  budgetPeriod: string;
+type BudgetPeriodProps = {  budgetPeriod: string;
   setBudgetPeriod: (value: string) => void;
-  startDate: Date;
-  setStartDate: (date: Date) => void;
+  startDate: string;
+  setStartDate: (date: string) => void;
 };
 
 const BudgetPeriod: React.FC<BudgetPeriodProps> = ({ budgetPeriod, setBudgetPeriod, startDate, setStartDate }) => {
   const [showDatePicker, setShowDatePicker] = useState(budgetPeriod === 'Every Other Week');
 
-  const toUTCDate = (date: Date) => {
-    return new Date(date.getTime() + date.getTimezoneOffset() * 60000);
-  };
 
   return (
     <View>
@@ -38,24 +35,25 @@ const BudgetPeriod: React.FC<BudgetPeriodProps> = ({ budgetPeriod, setBudgetPeri
         <Picker.Item label="Every Other Week" value="Every Other Week" />
       </Picker>
       {budgetPeriod === 'Every Other Week' && showDatePicker && (
-        Platform.OS === 'web' ? (
+        Platform.OS === 'web' ? (          
           <input
             type="date"
-            value={toUTCDate(startDate).toISOString().split('T')[0]}
-            onChange={(e) => setStartDate(new Date(e.target.value))}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
             // style={styles.input}
           />
         ) : (
-          <DateTimePicker
-            value={toUTCDate(startDate)}
-            mode="date"
-            display="default"
-            onChange={(event, selectedDate) => {
-              const currentDate = selectedDate || startDate;
-            //   setShowDatePicker(false);
-              setStartDate(currentDate);
-            }}
-          />
+          <></>          
+          // <DateTimePicker
+          //   value={new Date(startDate)}
+          //   mode="date"
+          //   display="default"
+          //   onChange={(event, selectedDate) => {
+          //     const currentDate = selectedDate || new Date(startDate);
+          //   //   setShowDatePicker(false);
+          //     setStartDate(formatDateToYYYYMMDD(currentDate));
+          //   }}
+          // />
         )
       )}
     </View>

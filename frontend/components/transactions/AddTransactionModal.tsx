@@ -1,9 +1,11 @@
+// filepath: c:\Users\james\dev\budgeting-app-3\frontend\components\transactions\AddTransactionModal.tsx
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, Button, StyleSheet, Platform, Switch } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import { addTransaction } from '@/services/transactions';
 import { Category } from '@/types';
+import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
 
 type AddTransactionModalProps = {
   visible: boolean;
@@ -16,8 +18,7 @@ type AddTransactionModalProps = {
 const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onClose, onAddTransaction, user, categories }) => {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(new Date());
-
+  const [date, setDate] = useState(formatDateToYYYYMMDD(new Date()));
   const [category, setCategory] = useState(categories[0]?.name || '');
   const [isIncome, setIsIncome] = useState(false);
 
@@ -39,15 +40,15 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onCl
     if (parseFloat(amount) <= 0) {
       alert('Amount must be greater than zero');
       return;
-    }
-
+    }    
     const categoryId = categories.find((cat) => cat.name === category)?.id || '';
     const adjustedAmount = isIncome ? parseFloat(amount) : -1 * parseFloat(amount);
-    const data = await addTransaction(user.uid, adjustedAmount, categoryId, name, date.toISOString().split('T')[0] );
+    
+    const data = await addTransaction(user.uid, adjustedAmount, categoryId, name, date);
     const newTransaction = {
       amount: adjustedAmount,
       category_id: categoryId,
-      date: date.toISOString().split('T')[0],
+      date: date,
       name,
       type: adjustedAmount < 0 ? 'debit' : 'credit',
       user_id: user.uid,
@@ -56,7 +57,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onCl
     onAddTransaction(newTransaction);
     setName('');
     setAmount('');
-    setDate(new Date());
+    setDate(formatDateToYYYYMMDD(new Date()));
     onClose();
   };
 
@@ -77,21 +78,20 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onCl
           onChangeText={setAmount}
           keyboardType="numeric"
         />
-        
         {Platform.OS === 'web' ? (
           <input
             type="date"
-            value={date.toISOString().split('T')[0]}
-            onChange={(e) => setDate(new Date(e.target.value))}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
             style={styles.input}
           />
         ) : (
           <View style={styles.datePickerContainer}>
             <DateTimePicker
-              value={date}
+              value={new Date(date)}
               mode="date"
               display="default"
-              onChange={(event, selectedDate) => setDate(selectedDate || date)}
+              onChange={(event, selectedDate) => selectedDate && setDate(formatDateToYYYYMMDD(selectedDate))}
             />
           </View>
         )}
@@ -149,3 +149,4 @@ const styles = StyleSheet.create({
 });
 
 export default AddTransactionModal;
+

@@ -13,7 +13,7 @@ import {
   setBiWeeklyDates,
   setYearlyDates,
   setPreviousBudgetPeriodTimeFrame,
-  setNextBudgetPeriodTimeFrame
+  setNextBudgetPeriodTimeFrame,
 } from '@/utils/dateUtils';
 
 export default function Tab() {
@@ -21,10 +21,9 @@ export default function Tab() {
   const { categories, loading, unallocatedFunds } = useCategories();
   const [allocated, setAllocated] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [budgetPeriod, setBudgetPeriod] = useState(user?.preferences.budget_period);
+  const [startDate, setStartDate] = useState(''); // Using string dates now
+  const [endDate, setEndDate] = useState(''); // Using string dates now
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);  const [budgetPeriod, setBudgetPeriod] = useState(user?.preferences.budget_period);
 
   useEffect(() => {
     if (budgetPeriod === 'monthly') {
@@ -48,7 +47,9 @@ export default function Tab() {
   }, [user, startDate, endDate]);
 
   useEffect(() => {
-    fetchAllocated();
+    if (startDate && endDate) {
+      fetchAllocated();
+    }
   }, [fetchAllocated]);
 
   const getAllocatedAmount = (categoryId: string) => {

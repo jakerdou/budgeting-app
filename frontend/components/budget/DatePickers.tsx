@@ -5,38 +5,31 @@ import { Ionicons } from '@expo/vector-icons'; // Import Ionicons for arrow butt
 import DropdownButton from '../DropdownButton'; // Import the new DropdownButton component
 
 type DatePickersProps = {
-    startDate: Date;
-    endDate: Date;
-    setStartDate: (date: Date) => void;
-    setEndDate: (date: Date) => void;
+    startDate: string;
+    endDate: string;
+    setStartDate: (date: string) => void;
+    setEndDate: (date: string) => void;
     preferences?: any;
     budgetPeriod: string;
     setBudgetPeriod: (period: string) => void;
-    setPreviousBudgetPeriodTimeFrame: (budgetPeriod: string, currentStartDate: Date, currentEndDate: Date, setStartDate: (date: Date) => void, setEndDate: (date: Date) => void) => void;
-    setNextBudgetPeriodTimeFrame: (budgetPeriod: string, currentStartDate: Date, currentEndDate: Date, setStartDate: (date: Date) => void, setEndDate: (date: Date) => void) => void;
+    setPreviousBudgetPeriodTimeFrame: (budgetPeriod: string, currentStartDate: string, currentEndDate: string, setStartDate: (date: string) => void, setEndDate: (date: string) => void) => void;
+    setNextBudgetPeriodTimeFrame: (budgetPeriod: string, currentStartDate: string, currentEndDate: string, setStartDate: (date: string) => void, setEndDate: (date: string) => void) => void;
 };
 
 const DatePickers: React.FC<DatePickersProps> = ({ startDate, endDate, setStartDate, setEndDate, preferences, budgetPeriod, setBudgetPeriod, setPreviousBudgetPeriodTimeFrame, setNextBudgetPeriodTimeFrame }) => {
   const budgetPeriods = ['Yearly', 'Monthly', 'Pay Period'];
-  // if (preferences?.pay_schedule) {
-  //   budgetPeriods.push('Pay Period');
-  // }
 
   const budgetPeriodsMapping: { [key: string]: string } = {
     'yearly': 'Yearly',
     'monthly': 'Monthly',
     [preferences?.budget_period]: 'Pay Period',
   };
-
-  const formatDate = (date: Date) => {
-    // const month = String(date.getMonth() + 1).padStart(2, '0');
-    // const day = String(date.getDate()).padStart(2, '0');
-    // const year = String(date.getFullYear()).slice(-2);
-    // return `${month}-${day}-${year}`;
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const year = String(date.getUTCFullYear()).slice(-2);
-    return `${month}-${day}-${year}`;
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    
+    // Parse the YYYY-MM-DD string into a display format MM-DD-YY
+    const [year, month, day] = dateStr.split('-');
+    return `${month}-${day}-${year.slice(-2)}`;
   };
 
   return (
