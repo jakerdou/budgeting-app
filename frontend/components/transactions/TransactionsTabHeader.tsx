@@ -2,21 +2,35 @@ import React from 'react';
 import { View, Text, Button, StyleSheet, Platform, TouchableOpacity } from 'react-native';
 import BankLinkButtonIOS from './BankLinkButtonIOS';
 import BankLinkButtonWeb from './BankLinkButtonWeb';
+import { Checkbox } from 'react-native-paper';
 
 interface TransactionsTabHeaderProps {
   onAddTransactionPress: () => void;
   onSyncTransactionsPress: () => void;
   isSyncing?: boolean;
+  showUncategorizedOnly: boolean;
+  onToggleUncategorized: () => void;
 }
 
 const TransactionsTabHeader: React.FC<TransactionsTabHeaderProps> = ({ 
   onAddTransactionPress,
   onSyncTransactionsPress,
-  isSyncing = false 
+  isSyncing = false,
+  showUncategorizedOnly,
+  onToggleUncategorized
 }) => {
   return (
     <View style={styles.header}>
-      <Text style={styles.title}>Transactions</Text>
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>Transactions</Text>
+        <View style={styles.filterContainer}>
+          <Checkbox
+            status={showUncategorizedOnly ? 'checked' : 'unchecked'}
+            onPress={onToggleUncategorized}
+          />
+          <Text style={styles.filterText}>Show uncategorized only</Text>
+        </View>
+      </View>
       <View style={styles.buttonContainer}>
         {Platform.OS === 'web' && <BankLinkButtonWeb />}
         {/* {Platform.OS === 'web' ? <BankLinkButtonWeb /> : Platform.OS === 'ios' ? <BankLinkButtonIOS /> : null} */}
@@ -45,9 +59,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  titleContainer: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+  },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  filterText: {
+    fontSize: 14,
+    color: '#666',
   },
   buttonContainer: {
     flexDirection: 'row',

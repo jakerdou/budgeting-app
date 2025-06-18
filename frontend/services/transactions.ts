@@ -41,6 +41,26 @@ export const addTransaction = async (userId: string, amount: number, categoryId:
     return data;
 };
 
+export const getTransactionsForCategory = async (userId: string, categoryId: string) => {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/get-transactions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        category_id: categoryId,
+      }),
+    });
+  
+    if (!response.ok) {
+      throw new Error('Failed to fetch category transactions');
+    }
+  
+    const data = await response.json();
+    return data;
+};
+
 export const deleteTransaction = async (userId: string, transactionId: string) => {
     const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/delete-transaction`, {
         method: 'POST',

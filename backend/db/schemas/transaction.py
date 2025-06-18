@@ -9,8 +9,8 @@ class Transaction(FirestoreModel):
     amount: float
     user_id: str
     name: str
-    date: str
-    category_id: Optional[str] = None
+    date: str    
+    category_id: Optional[str] = None  # Explicitly nullable field
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     type: str = "debit"  # 'debit' or 'credit'
     plaid_transaction_id: Optional[str] = None

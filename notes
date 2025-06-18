@@ -3,7 +3,7 @@ to make mvp:
         2 - create wireframes
         3 - enact change >:)
 
-    change allocations date so it's just a string like transaction. allocations aren't showing up correctly. We're basically skipping the last day.
+    implement pagination for transactions
 
 
 less important
@@ -14,8 +14,6 @@ less important
     move db.py to backend db folder
 
     there's an issue with plaid link on ios, look at homepage file from tiny quickstart and compare them to see if there's any issue
-
-    figure out why categories sometimes comes back empty - i think i did it (or at least fixed it idk why it was happening)
 
     right now we get categories in the frontend in the categories provider, then we call the endpoint to get allocated backend endpoint and then pair them in the frontend, maybe just get categories as a whole form the backend, idk
 

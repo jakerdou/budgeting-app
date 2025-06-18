@@ -43,7 +43,7 @@ export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         ...doc.data(),
       } as Category));
       
-      console.log('Fetched categories:', fetchedCategories);
+      // console.log('Fetched categories:', fetchedCategories);
       setCategories(fetchedCategories);
       
       // Find the unallocated funds category

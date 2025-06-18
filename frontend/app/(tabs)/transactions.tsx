@@ -21,6 +21,7 @@ export default function Tab() {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingCategoryChanges, setPendingCategoryChanges] = useState<Record<string, boolean>>({});
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
+  const [showUncategorizedOnly, setShowUncategorizedOnly] = useState(false);
 
   const fetchTransactions = async () => {
     if (user) {
@@ -288,13 +289,21 @@ export default function Tab() {
       console.log('Selected Transactions:', newSelection);
       return newSelection;
     });
-  };  
+  };    // Filter transactions if "showUncategorizedOnly" is enabled
+  const displayedTransactions = showUncategorizedOnly
+    ? transactions.filter(transaction => transaction.category_id === null)
+    : transactions;
+
+  console.log('transactions[0]:', transactions[0]);
+  
   return (
     <SafeAreaView style={styles.container}>      
     <TransactionsTabHeader 
         onAddTransactionPress={() => setModalVisible(true)}
         onSyncTransactionsPress={fetchNewTransactions}
         isSyncing={isLoading}
+        showUncategorizedOnly={showUncategorizedOnly}
+        onToggleUncategorized={() => setShowUncategorizedOnly(prev => !prev)}
       />        
       {selectedTransactions.length > 0 && (
         <BulkCategorySelectionBar 
@@ -305,14 +314,28 @@ export default function Tab() {
           onClearSelection={() => setSelectedTransactions([])}
         />
       )}
-      
-      <FlatList
-        data={transactions}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        // ListHeaderComponent={<Text style={styles.sectionHeader}>Transactions</Text>}
-      />
+        {displayedTransactions.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>
+            {showUncategorizedOnly 
+              ? "No uncategorized transactions found" 
+              : "No transactions found"}
+          </Text>
+          <Text style={styles.emptySubtext}>
+            {showUncategorizedOnly 
+              ? "Try turning off the uncategorized filter" 
+              : "Try adding a transaction or syncing with your bank account"}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={displayedTransactions}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          // ListHeaderComponent={<Text style={styles.sectionHeader}>Transactions</Text>}
+        />
+      )}
       <AddTransactionModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
@@ -365,8 +388,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     textAlign: 'right',
     minWidth: 60, // Ensure enough space for values
-  },  
-  sectionHeader: {
+  },    sectionHeader: {
     fontSize: 20,
     fontWeight: 'bold',
     marginVertical: 8,  
@@ -383,5 +405,24 @@ const styles = StyleSheet.create({
     height: 40,
     width: 150, // Slightly smaller to better fit in the right-aligned group
     color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    maxWidth: '80%',
   }
 });

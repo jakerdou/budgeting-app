@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { useCategories } from '@/context/CategoriesProvider';
 import AddCategoryModal from '@/components/budget/AddCategoryModal';
 import AssignmentModal from '@/components/budget/AssignmentModal';
+import CategoryInfoModal from '@/components/budget/CategoryInfoModal';
 import BudgetTabHeader from '@/components/budget/BudgetTabHeader';
 import { getAllocated, deleteCategory } from '@/services/categories';
 import { Category } from '@/types';
@@ -23,7 +24,10 @@ export default function Tab() {
   const [modalVisible, setModalVisible] = useState(false);
   const [startDate, setStartDate] = useState(''); // Using string dates now
   const [endDate, setEndDate] = useState(''); // Using string dates now
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);  const [budgetPeriod, setBudgetPeriod] = useState(user?.preferences.budget_period);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [budgetPeriod, setBudgetPeriod] = useState(user?.preferences.budget_period);
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [selectedInfoCategory, setSelectedInfoCategory] = useState<Category | null>(null);
 
   useEffect(() => {
     if (budgetPeriod === 'monthly') {
@@ -95,7 +99,6 @@ export default function Tab() {
       );
     }
   };
-
   const renderItem = ({ item }: { item: Category }) => {
     const allocatedAmount = getAllocatedAmount(item.id);
     return (
@@ -104,7 +107,24 @@ export default function Tab() {
           style={styles.categoryContent}
           onPress={() => setSelectedCategory(item)}
         >
-          <Text style={styles.name}>{item.name}</Text>
+          <View style={styles.nameContainer}>
+            <Text style={styles.name}>{item.name}</Text>
+            <TouchableOpacity 
+              style={styles.infoButton}
+              onPress={() => {
+                setSelectedInfoCategory(item);
+                setInfoModalVisible(true);
+              }}
+              accessibilityLabel={`Show info for ${item.name}`}
+            >
+              <Ionicons 
+                name="information-circle-outline" 
+                size={22} 
+                color="#007BFF" 
+                accessibilityLabel="Info"
+              />
+            </TouchableOpacity>
+          </View>
           <View style={styles.valuesContainer}>
             <Text style={styles.value}>Allocated: ${allocatedAmount.toFixed(2)}</Text>
             <Text style={styles.value}>Available: ${item.available.toFixed(2)}</Text>
@@ -160,13 +180,20 @@ export default function Tab() {
         onClose={() => setModalVisible(false)}
         userId={user?.uid}
         onNewCategory={() => fetchAllocated()}
-      />      
+      />        
       <AssignmentModal
         visible={!!selectedCategory}
         onClose={() => setSelectedCategory(null)}
         category={selectedCategory}
         userId={user?.uid || ''}
         onAssignmentCreated={fetchAllocated}
+      />      
+      <CategoryInfoModal 
+        visible={infoModalVisible}
+        category={selectedInfoCategory}
+        onClose={() => setInfoModalVisible(false)}
+        startDate={startDate}
+        endDate={endDate}
       />
     </SafeAreaView>
   );
@@ -193,10 +220,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },  
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   name: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  infoButton: {
+    marginLeft: 8,
+    padding: 4,
   },
   valuesContainer: {
     flexDirection: 'row',

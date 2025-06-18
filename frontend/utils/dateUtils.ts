@@ -21,7 +21,7 @@ export const setBiWeeklyDates = (
   setEndDate: (date: string) => void
 ) => {
   if (userPreferences?.start_date) {
-    console.log('Setting bi-weekly dates based on user preferences:', userPreferences.start_date);
+    // console.log('Setting bi-weekly dates based on user preferences:', userPreferences.start_date);
     
     // Ensure we have a valid date format
     let payStartDateStr = userPreferences.start_date;
@@ -43,7 +43,8 @@ export const setBiWeeklyDates = (
     while (periodStartDate <= currentDate) {
       periodStartDate = addDays(periodStartDate, 14);
     }
-    periodStartDate = addDays(periodStartDate, -14);    console.log('Calculated period start date:', formatDateToYYYYMMDD(periodStartDate), 'ISO string:', periodStartDate.toISOString());
+    periodStartDate = addDays(periodStartDate, -14);    
+    // console.log('Calculated period start date:', formatDateToYYYYMMDD(periodStartDate), 'ISO string:', periodStartDate.toISOString());
     
     setStartDate(formatDateToYYYYMMDD(periodStartDate));
     setEndDate(formatDateToYYYYMMDD(addDays(periodStartDate, 13)));

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
-from .db import db
+from .db import db, NULL_VALUE
 from .plaid_utils import get_plaid_transactions, get_saved_cursor  # Assuming helper functions exist for Plaid API calls
 from backend.db.schemas import Transaction as TransactionSchema
 import logging
@@ -18,6 +18,7 @@ class User(BaseModel):
 # Request model for the POST request
 class UserIDRequest(BaseModel):
     user_id: str
+    category_id: str = None
 
 class Category(BaseModel):
     name: str
@@ -46,9 +47,23 @@ class SyncPlaidTransactionsRequest(BaseModel):
 async def get_transactions(request: UserIDRequest):
     try:
         # logger.info("Fetching transactions for user_id: %s", request.user_id)
-        
-        # Query transactions with a `user_id` field equal to `request.user_id`
+          # Start with the basic user_id filter
         transactions_query = db.collection("transactions").where("user_id", "==", request.user_id)
+        
+        # If a category_id is provided, add that filter
+        if request.category_id:
+            logger.info(f"Filtering transactions by category_id: {request.category_id}")
+              # Special case for handling "null" category - find transactions with no category
+            if request.category_id == "null":
+                print("Filtering for null category_id")
+                # Use NULL_VALUE (None) for consistent null value handling
+                transactions_query = db.collection("transactions").where("user_id", "==", request.user_id).where("category_id", "==", NULL_VALUE)
+                
+                # No need to return early now, we'll use the normal flow
+                print(f"Using NULL_VALUE to query for transactions with null category_id")
+            else:
+                transactions_query = db.collection("transactions").where("user_id", "==", request.user_id).where("category_id", "==", request.category_id)
+        
         transactions_docs = transactions_query.stream()
 
         # Collect transactions into a list, converting each document to a dictionary
@@ -56,6 +71,9 @@ async def get_transactions(request: UserIDRequest):
         for doc in transactions_docs:
             transaction_data = doc.to_dict()
             transaction_data["id"] = doc.id  # Add the transaction ID to the response
+            
+            # Debug the category ID situation
+            # print(f"Transaction {doc.id} category_id = {transaction_data.get('category_id')}")
             
             # Remove or handle any unserializable fields here, if necessary
             transactions.append(transaction_data)
@@ -68,8 +86,8 @@ async def get_transactions(request: UserIDRequest):
         return {"transactions": transactions}
     
     except Exception as e:
-        # logger.error("Failed to get transactions for user_id: %s, error: %s", request.user_id, e)
-        raise HTTPException(status_code=500, detail=f"Failed to get transactions: %e")
+        logger.error(f"Failed to get transactions for user_id: {request.user_id}, error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get transactions: {str(e)}")
     
 @router.post("/create-transaction")
 async def create_transaction(transaction: Transaction):
@@ -293,10 +311,9 @@ async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):
             
             # Store the last cursor for this item to update later
             if last_cursor:
-                cursor_updates[item_id] = last_cursor
-
-        # Process added transactions
+                cursor_updates[item_id] = last_cursor        # Process added transactions
         print(f"Processing {len(added_transactions)} added transactions")
+        print("Debug: Making sure category_id is explicitly set to None")
         for transaction in added_transactions:
             # Get the correct item_data for this transaction
             item_data = transaction_item_map.get(transaction["transaction_id"])
@@ -309,8 +326,7 @@ async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):
             account_name = next(
                 (account["name"] for account in item_data.get("accounts", []) if account["account_id"] == transaction["account_id"]),
                 None
-            )
-
+            )              
             # Create a validated transaction using our schema
             transaction_schema = TransactionSchema(
                 amount=-transaction["amount"],
@@ -319,11 +335,35 @@ async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):
                 user_id=user_id,
                 plaid_transaction_id=transaction["transaction_id"],
                 institution_name=item_data["institution_name"],
-                account_name=account_name
+                account_name=account_name,
+                category_id=None  # Explicitly set category_id to None for new transactions
             )
             
+            # Create explicit transaction data dictionary
+            transaction_dict = {
+                "amount": -transaction["amount"],
+                "name": transaction["name"],
+                "date": transaction['date'].strftime("%Y-%m-%d"),
+                "user_id": user_id,
+                "plaid_transaction_id": transaction["transaction_id"],
+                "institution_name": item_data["institution_name"],
+                "account_name": account_name,
+                "category_id": NULL_VALUE,  # Use the explicit NULL_VALUE constant
+                "created_at": datetime.now(timezone.utc),
+                "type": "debit" if -transaction["amount"] < 0 else "credit"
+            }
+            
+            print(f"Debug direct dictionary with NULL_VALUE: {transaction_dict}")
+            
             transaction_ref = db.collection("transactions").document()
-            transaction_ref.set(transaction_schema.to_dict())
+            # Use merge=False to ensure fields are set exactly as provided
+            transaction_ref.set(transaction_dict, merge=False)
+            
+            # Verify the document was created with the category_id field
+            created_doc = transaction_ref.get()
+            created_data = created_doc.to_dict()
+            print(f"Debug created document data: {created_data}")
+            print(f"Debug created document has category_id: {'category_id' in created_data}")
 
         # Process modified transactions
         print(f"Processing {len(modified_transactions)} modified transactions")
@@ -353,8 +393,7 @@ async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):
                 })
             else:
                 print(f"Creating new transaction for modified transaction: {transaction['transaction_id']}")
-                
-                # Create a validated transaction using our schema
+                  # Create a validated transaction using our schema
                 transaction_schema = TransactionSchema(
                     amount=-transaction["amount"],
                     name=transaction["name"],
@@ -362,11 +401,29 @@ async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):
                     user_id=user_id,
                     plaid_transaction_id=transaction["transaction_id"],
                     institution_name=item_data["institution_name"],
-                    account_name=account_name
+                    account_name=account_name,
+                    category_id=None  # Explicitly set category_id to None for modified transactions
                 )
                 
+                # Create explicit transaction data dictionary
+                transaction_dict = {
+                    "amount": -transaction["amount"],
+                    "name": transaction["name"],
+                    "date": transaction['date'].strftime("%Y-%m-%d"),
+                    "user_id": user_id,
+                    "plaid_transaction_id": transaction["transaction_id"],
+                    "institution_name": item_data["institution_name"],
+                    "account_name": account_name,
+                    "category_id": NULL_VALUE,  # Use the explicit NULL_VALUE constant
+                    "created_at": datetime.now(timezone.utc),
+                    "type": "debit" if -transaction["amount"] < 0 else "credit"
+                }
+                
+                print(f"Debug modified transaction with NULL_VALUE: {transaction_dict}")
+                
                 transaction_ref = db.collection("transactions").document()
-                transaction_ref.set(transaction_schema.to_dict())
+                # Use merge=False to ensure fields are set exactly as provided
+                transaction_ref.set(transaction_dict, merge=False)
 
         # Process deleted transactions
         print(f"Processing {len(deleted_transactions)} deleted transactions")
