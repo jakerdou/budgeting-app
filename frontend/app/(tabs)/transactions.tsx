@@ -19,16 +19,26 @@ export default function Tab() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [pendingCategoryChanges, setPendingCategoryChanges] = useState<Record<string, boolean>>({});
-  const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
-  const [showUncategorizedOnly, setShowUncategorizedOnly] = useState(false);
-
-  const fetchTransactions = async () => {
+  const [isLoadingMore, setIsLoadingMore] = useState(false);  // New state for loading more
+  const [pendingCategoryChanges, setPendingCategoryChanges] = useState<Record<string, boolean>>({});  const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  
+  // Pagination state
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const fetchTransactions = async (replace: boolean = true) => {
     if (user) {
       try {
         setIsLoading(true);
-        const data = await getTransactions(user.uid);
+        const data = await getTransactions(
+          user.uid, 
+          selectedCategoryId,
+          20,  // Limit to 20 transactions per page
+          null  // No cursor for initial load
+        );
         setTransactions(data.transactions);
+        setNextCursor(data.pagination.next_cursor);
+        setHasMore(data.pagination.has_more);
       } catch (error) {
         console.error('Failed to fetch transactions', error);
         Alert.alert('Error', 'Failed to load transactions');
@@ -38,6 +48,28 @@ export default function Tab() {
     }
   };
 
+  const loadMoreTransactions = async () => {
+    if (user && hasMore && nextCursor && !isLoadingMore) {
+      try {
+        setIsLoadingMore(true);
+        const data = await getTransactions(
+          user.uid,
+          selectedCategoryId,
+          20,  // Limit to 20 transactions per page
+          nextCursor
+        );
+        
+        // Append the new transactions to existing ones
+        setTransactions(prev => [...prev, ...data.transactions]);
+        setNextCursor(data.pagination.next_cursor);
+        setHasMore(data.pagination.has_more);
+      } catch (error) {
+        console.error('Failed to load more transactions', error);
+      } finally {
+        setIsLoadingMore(false);
+      }
+    }
+  };
   const fetchNewTransactions = async () => {
     if (user) {
       try {
@@ -59,10 +91,12 @@ export default function Tab() {
       }
     }
   };
-
   useEffect(() => {
+    // Reset pagination and fetch transactions when user or category filter changes
+    setNextCursor(null);
+    setHasMore(true);
     fetchTransactions();
-  }, [user]);
+  }, [user, selectedCategoryId]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -287,24 +321,25 @@ export default function Tab() {
         : [...prev, transactionId];
       
       console.log('Selected Transactions:', newSelection);
-      return newSelection;
-    });
-  };    // Filter transactions if "showUncategorizedOnly" is enabled
-  const displayedTransactions = showUncategorizedOnly
-    ? transactions.filter(transaction => transaction.category_id === null)
-    : transactions;
+      return newSelection;    });
+  };    
+  
+  // The filtering is now handled server-side by passing the category_id to the API
+  // We don't need to filter on the client, as the transactions array already contains
+  // the filtered results from the API
+  const displayedTransactions = transactions;
 
   console.log('transactions[0]:', transactions[0]);
   
   return (
-    <SafeAreaView style={styles.container}>      
-    <TransactionsTabHeader 
+    <SafeAreaView style={styles.container}>        <TransactionsTabHeader 
         onAddTransactionPress={() => setModalVisible(true)}
         onSyncTransactionsPress={fetchNewTransactions}
         isSyncing={isLoading}
-        showUncategorizedOnly={showUncategorizedOnly}
-        onToggleUncategorized={() => setShowUncategorizedOnly(prev => !prev)}
-      />        
+        categories={categories}
+        selectedCategoryId={selectedCategoryId}
+        onCategoryFilterChange={(categoryId) => setSelectedCategoryId(categoryId)}
+      />
       {selectedTransactions.length > 0 && (
         <BulkCategorySelectionBar 
           selectedTransactions={selectedTransactions}
@@ -313,27 +348,47 @@ export default function Tab() {
           onCategoryUpdateComplete={fetchTransactions}
           onClearSelection={() => setSelectedTransactions([])}
         />
-      )}
-        {displayedTransactions.length === 0 ? (
+      )}        {displayedTransactions.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
-            {showUncategorizedOnly 
+            {selectedCategoryId === "null"
               ? "No uncategorized transactions found" 
-              : "No transactions found"}
+              : selectedCategoryId
+                ? "No transactions found in this category"
+                : "No transactions found"}
           </Text>
           <Text style={styles.emptySubtext}>
-            {showUncategorizedOnly 
-              ? "Try turning off the uncategorized filter" 
+            {selectedCategoryId !== null
+              ? "Try selecting a different category filter" 
               : "Try adding a transaction or syncing with your bank account"}
           </Text>
         </View>
-      ) : (
-        <FlatList
+      ) : (        <FlatList
           data={displayedTransactions}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           // ListHeaderComponent={<Text style={styles.sectionHeader}>Transactions</Text>}
+          onEndReached={loadMoreTransactions}
+          onEndReachedThreshold={0.1}
+          ListFooterComponent={
+            isLoadingMore ? (
+              <View style={styles.loadingMoreContainer}>
+                <Text style={styles.loadingText}>Loading more transactions...</Text>
+              </View>
+            ) : hasMore ? (
+              <TouchableOpacity 
+                style={styles.loadMoreButton} 
+                onPress={loadMoreTransactions}
+              >
+                <Text style={styles.loadMoreText}>Load More</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.endOfListText}>No more transactions</Text>
+            )
+          }
+          refreshing={isLoading}
+          onRefresh={() => fetchTransactions()}
         />
       )}
       <AddTransactionModal
@@ -424,5 +479,36 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     maxWidth: '80%',
-  }
+  },
+  loadingMoreContainer: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    padding: 10,
+  },
+  loadMoreButton: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 12,
+    margin: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    fontSize: 16,
+    color: '#0066cc',
+    fontWeight: '500',
+  },
+  endOfListText: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    padding: 16,
+    fontStyle: 'italic',
+  },
 });

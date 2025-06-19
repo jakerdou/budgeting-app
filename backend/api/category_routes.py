@@ -105,9 +105,9 @@ async def get_categories_with_allocated(request: CategoriesWithAllocatedRequest)
 @router.post("/get-allocated")
 async def get_allocated(request: CategoriesWithAllocatedRequest):
     try:        # Debug request information
-        print(f"DEBUG - get-allocated called with user_id: {request.user_id}")
-        print(f"DEBUG - Start date: {request.start_date}")
-        print(f"DEBUG - End date: {request.end_date}")
+        # print(f"DEBUG - get-allocated called with user_id: {request.user_id}")
+        # print(f"DEBUG - Start date: {request.start_date}")
+        # print(f"DEBUG - End date: {request.end_date}")
         
         # Query categories with a `user_id` field equal to `request.user_id`
         categories_query = db.collection("categories").where("user_id", "==", request.user_id)
@@ -123,7 +123,7 @@ async def get_allocated(request: CategoriesWithAllocatedRequest):
         for doc in categories_docs:
             category_count += 1
             category_data = doc.to_dict()
-            print(f"DEBUG - Processing category: {doc.id}, name: {category_data.get('name', 'Unknown')}")
+            # print(f"DEBUG - Processing category: {doc.id}, name: {category_data.get('name', 'Unknown')}")
             
             allocated_data = {}
             allocated_data["category_id"] = doc.id  # Add the category ID to the response
@@ -132,13 +132,13 @@ async def get_allocated(request: CategoriesWithAllocatedRequest):
             # Using helper function to get the next day for inclusive end date
             next_day_str = get_next_day_str(request.end_date)
             assignments_query = db.collection("assignments").where("category_id", "==", doc.id).where("date", ">=", request.start_date).where("date", "<", next_day_str)
-            print(f"DEBUG - Using date range: {request.start_date} to {request.end_date} (exclusive upper bound: {next_day_str})")
+            # print(f"DEBUG - Using date range: {request.start_date} to {request.end_date} (exclusive upper bound: {next_day_str})")
 
             # Try to catch any issues with the stream operation
             try:
-                print(f"DEBUG - About to stream assignments for category {doc.id}")
+                # print(f"DEBUG - About to stream assignments for category {doc.id}")
                 assignments_docs = assignments_query.stream()
-                print(f"DEBUG - Stream operation completed for category {doc.id}")
+                # print(f"DEBUG - Stream operation completed for category {doc.id}")
                 
                 # Count assignments for debugging
                 assignment_count = 0
@@ -147,33 +147,33 @@ async def get_allocated(request: CategoriesWithAllocatedRequest):
                 for assignment in assignments_docs:
                     assignment_count += 1
                     assignment_data = assignment.to_dict()
-                    print(f"DEBUG - Assignment found: {assignment_data}")
+                    # print(f"DEBUG - Assignment found: {assignment_data}")
                     amount = assignment_data.get("amount", 0.0)
                     assignment_total += amount
-                    print(f"DEBUG - Running total: {assignment_total}")
+                    # print(f"DEBUG - Running total: {assignment_total}")
                 
-                print(f"DEBUG - Found {assignment_count} assignments for category {doc.id}")
+                # print(f"DEBUG - Found {assignment_count} assignments for category {doc.id}")
                 allocated_amount = assignment_total
                 
             except Exception as stream_error:
-                print(f"DEBUG - Error streaming assignments: {str(stream_error)}")
+                # print(f"DEBUG - Error streaming assignments: {str(stream_error)}")
                 # Fallback to ensure we continue processing
                 allocated_amount = 0.0
                 
             allocated_data["allocated"] = allocated_amount
             allocated.append(allocated_data)
 
-        print(f"DEBUG - Processed {category_count} categories, returning {len(allocated)} allocation records")
+        # print(f"DEBUG - Processed {category_count} categories, returning {len(allocated)} allocation records")
         
         # Debug the final result structure before returning
-        print(f"DEBUG - Final response structure: {{'allocated': {allocated}}}")
+        # print(f"DEBUG - Final response structure: {{'allocated': {allocated}}}")
         
         # logger.info("Successfully fetched allocated amounts for user_id: %s", request.user_id)
         return {"allocated": allocated}
     
     except Exception as e:
-        print(f"DEBUG - Exception in get-allocated: {str(e)}")
-        print(f"DEBUG - Exception type: {type(e)}")
+        # print(f"DEBUG - Exception in get-allocated: {str(e)}")
+        # print(f"DEBUG - Exception type: {type(e)}")
         # logger.error("Failed to get categories with allocated amounts for user_id: %s, error: %s", request.user_id, e)
         raise HTTPException(status_code=500, detail=f"Failed to get categories with allocated amounts: {str(e)}")
 

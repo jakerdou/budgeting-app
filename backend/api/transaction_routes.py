@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
+from google.cloud import firestore
 from .db import db, NULL_VALUE
 from .plaid_utils import get_plaid_transactions, get_saved_cursor  # Assuming helper functions exist for Plaid API calls
 from backend.db.schemas import Transaction as TransactionSchema
@@ -19,6 +20,8 @@ class User(BaseModel):
 class UserIDRequest(BaseModel):
     user_id: str
     category_id: str = None
+    limit: int = 20  # Default number of transactions per page
+    cursor_id: str = None  # Document ID to start after for pagination
 
 class Category(BaseModel):
     name: str
@@ -46,31 +49,54 @@ class SyncPlaidTransactionsRequest(BaseModel):
 @router.post("/get-transactions")
 async def get_transactions(request: UserIDRequest):
     try:
-        # logger.info("Fetching transactions for user_id: %s", request.user_id)
-          # Start with the basic user_id filter
+        # print(f"Request received: user_id={request.user_id}, category_id={request.category_id}, limit={request.limit}, cursor_id={request.cursor_id}")
+        
+        # Start with the basic user_id filter
         transactions_query = db.collection("transactions").where("user_id", "==", request.user_id)
         
         # If a category_id is provided, add that filter
         if request.category_id:
             logger.info(f"Filtering transactions by category_id: {request.category_id}")
-              # Special case for handling "null" category - find transactions with no category
+            
+            # Special case for handling "null" category - find transactions with no category
             if request.category_id == "null":
                 print("Filtering for null category_id")
                 # Use NULL_VALUE (None) for consistent null value handling
                 transactions_query = db.collection("transactions").where("user_id", "==", request.user_id).where("category_id", "==", NULL_VALUE)
                 
-                # No need to return early now, we'll use the normal flow
                 print(f"Using NULL_VALUE to query for transactions with null category_id")
             else:
                 transactions_query = db.collection("transactions").where("user_id", "==", request.user_id).where("category_id", "==", request.category_id)
         
+        # Sort by date in descending order (most recent first)
+        transactions_query = transactions_query.order_by("date", direction=firestore.Query.DESCENDING)
+        
+        # If cursor_id is provided, start after that document for pagination
+        if request.cursor_id:
+            # Get the document to use as cursor
+            cursor_doc = db.collection("transactions").document(request.cursor_id).get()
+            if cursor_doc.exists:
+                transactions_query = transactions_query.start_after(cursor_doc)
+                print(f"Starting after document with ID: {request.cursor_id}")
+            else:
+                print(f"Cursor document with ID {request.cursor_id} not found")
+        
+        # Limit the number of results
+        transactions_query = transactions_query.limit(request.limit)
+        
+        # Execute the query
         transactions_docs = transactions_query.stream()
 
         # Collect transactions into a list, converting each document to a dictionary
         transactions = []
+        last_doc_id = None
+        
         for doc in transactions_docs:
             transaction_data = doc.to_dict()
             transaction_data["id"] = doc.id  # Add the transaction ID to the response
+            
+            # Store the last document ID for pagination
+            last_doc_id = doc.id
             
             # Debug the category ID situation
             # print(f"Transaction {doc.id} category_id = {transaction_data.get('category_id')}")
@@ -79,11 +105,20 @@ async def get_transactions(request: UserIDRequest):
             transactions.append(transaction_data)
 
         # Sort transactions by date (most to least recent)
-        transactions.sort(key=lambda x: x["date"], reverse=True)
+        # Note: This should be unnecessary since we're already sorting in the query
+        # transactions.sort(key=lambda x: x["date"], reverse=True)
 
-        # logger.info("Successfully fetched transactions for user_id: %s", request.user_id)
-        # logger.info("Transactions: %s", transactions)
-        return {"transactions": transactions}
+        # Determine if there are more results
+        has_more = len(transactions) == request.limit
+        
+        # Return the transactions along with pagination metadata
+        return {
+            "transactions": transactions,
+            "pagination": {
+                "has_more": has_more,
+                "next_cursor": last_doc_id if has_more else None
+            }
+        }
     
     except Exception as e:
         logger.error(f"Failed to get transactions for user_id: {request.user_id}, error: {str(e)}")

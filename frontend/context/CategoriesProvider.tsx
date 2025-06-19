@@ -34,17 +34,24 @@ export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const categoriesQuery = query(
       collection(db, 'categories'),
       where('user_id', '==', user.uid)
-    );
-
-    // Subscribe to Firestore updates
+    );    // Subscribe to Firestore updates
     const unsubscribe = onSnapshot(categoriesQuery, (snapshot) => {
       const fetchedCategories: Category[] = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       } as Category));
+        // Sort categories: Unallocated Funds at top, rest alphabetically
+      const sortedCategories = [...fetchedCategories].sort((a, b) => {
+        // Always put Unallocated Funds at the top
+        if (a.is_unallocated_funds) return -1;
+        if (b.is_unallocated_funds) return 1;
+        
+        // Otherwise sort alphabetically by name
+        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+      });
       
-      // console.log('Fetched categories:', fetchedCategories);
-      setCategories(fetchedCategories);
+      // console.log('Fetched categories:', sortedCategories);
+      setCategories(sortedCategories);
       
       // Find the unallocated funds category
       const unallocated = fetchedCategories.find(category => category.is_unallocated_funds) || null;

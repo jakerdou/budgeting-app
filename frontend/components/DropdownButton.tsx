@@ -82,43 +82,48 @@ const DropdownButton: React.FC<DropdownButtonProps> = ({ options, selectedOption
 
 const styles = StyleSheet.create({
   container: {
-    // Add your styles here
+    minWidth: 120,
   },
   button: {
-    padding: 10,
+    padding: 8,
     borderRadius: 5,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#ccc',
   },
   buttonText: {
-    // Add your styles here
+    fontSize: 14,
+    color: '#333',
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
   modalContent: {
     position: 'absolute',
     backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    zIndex: 1000,
+    minWidth: 120,
   },
   optionButton: {
     paddingVertical: 10,
+    paddingHorizontal: 16,
     alignItems: 'center',
   },
   optionText: {
-    // Add your styles here
+    fontSize: 14,
+    color: '#333',
   },
   separator: {
     height: 1,
-    backgroundColor: '#d3d3d3',
-    marginVertical: 5,
+    backgroundColor: '#eee',
   },
 });
 

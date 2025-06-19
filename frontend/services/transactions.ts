@@ -1,17 +1,36 @@
-export const getTransactions = async (userId: string) => {
+export const getTransactions = async (userId: string, categoryId: string | null = null, limit: number = 20, cursorId: string | null = null) => {
+    // Create the request body, ensuring we only include defined values
+    const requestBody: any = {
+      user_id: userId
+    };
+    
+    // Only add category_id if it's provided
+    if (categoryId !== null) {
+      requestBody.category_id = categoryId;
+    }
+    
+    // Only add limit if it's not the default
+    if (limit !== 20) {
+      requestBody.limit = limit;
+    }
+    
+    // Only add cursor_id if it's provided
+    if (cursorId !== null) {
+      requestBody.cursor_id = cursorId;
+    }
+
+    console.log("Transaction request payload:", requestBody);
 
     const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/get-transactions`, {
       method: 'POST',
       headers: {
       'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-      user_id: userId,
-      }),
+      body: JSON.stringify(requestBody),
     });
   
     if (!response.ok) {
-      throw new Error('Failed to fetch categories');
+      throw new Error('Failed to fetch transactions');
     }
   
     const data = await response.json();
