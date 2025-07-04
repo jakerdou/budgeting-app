@@ -91,3 +91,25 @@ export const deleteCategory = async (userId: string, categoryId: string) => {
     const data = await response.json();
     return data;
 };
+
+export const updateCategoryName = async (userId: string, categoryId: string, newName: string) => {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_CATEGORY_PREFIX}/update-category-name`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            category_id: categoryId,
+            name: newName,
+        }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update category name');
+    }
+
+    const data = await response.json();
+    return data;
+};

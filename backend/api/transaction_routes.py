@@ -232,7 +232,16 @@ async def update_transaction_category(request: UpdateTransactionCategoryRequest)
             raise HTTPException(status_code=404, detail="Old category not found")
         
         old_category_data = old_category_doc.to_dict() if old_category_doc else None
-        print(f"Old category data: {old_category_data}")        
+        print(f"Old category data: {old_category_data}")
+        
+        # Check if the category is already the same - no need to update
+        normalized_old_category_id = old_category_id if old_category_id else None
+        normalized_new_category_id = None if (request.category_id == "null" or request.category_id is None) else request.category_id
+        
+        if normalized_old_category_id == normalized_new_category_id:
+            print(f"Category is already the same ({normalized_old_category_id}), no update needed")
+            return {"message": "Transaction category is already set to the requested category.", "transaction_id": request.transaction_id}
+        
         # Handle setting category to null/None
         if request.category_id == "null" or request.category_id is None:
             print(f"Setting transaction {request.transaction_id} to have no category")

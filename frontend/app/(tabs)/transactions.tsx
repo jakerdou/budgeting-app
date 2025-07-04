@@ -300,7 +300,14 @@ export default function Tab() {
             </TouchableOpacity>
           )}
           
-          <Text style={styles.value}>{item.amount}</Text>
+          <Text style={[
+            styles.value, 
+            parseFloat(item.amount.toString()) > 0 ? styles.positiveAmount : styles.negativeAmount
+          ]}>
+            {parseFloat(item.amount.toString()) > 0 
+              ? `+$${item.amount}` 
+              : `$${Math.abs(parseFloat(item.amount.toString())).toFixed(2)}`}
+          </Text>
           <TouchableOpacity onPress={() => showMenu(item.id)}>
             <MaterialIcons name="more-vert" size={24} color="black" />
           </TouchableOpacity>
@@ -363,7 +370,8 @@ export default function Tab() {
               : "Try adding a transaction or syncing with your bank account"}
           </Text>
         </View>
-      ) : (        <FlatList
+      ) : (        
+        <FlatList
           data={displayedTransactions}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
@@ -443,6 +451,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     textAlign: 'right',
     minWidth: 60, // Ensure enough space for values
+  },
+  positiveAmount: {
+    color: '#28a745', // Green color for positive amounts
+    fontWeight: '600',
+  },
+  negativeAmount: {
+    color: '#666', // Default color for negative amounts
   },    sectionHeader: {
     fontSize: 20,
     fontWeight: 'bold',

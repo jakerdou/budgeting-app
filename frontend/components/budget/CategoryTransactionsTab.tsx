@@ -71,7 +71,7 @@ const CategoryTransactionsTab: React.FC<CategoryTransactionsTabProps> = ({
     <View style={styles.transactionItem}>
       <View style={styles.transactionLeft}>
         <Text style={styles.transactionName}>{item.name}</Text>
-        <Text style={styles.transactionDate}>{formatDate(item.date)}</Text>
+        <Text style={styles.transactionDate}>{item.date}</Text>
       </View>      
       <Text style={[
         styles.transactionAmount,

@@ -38,6 +38,11 @@ class DeleteCategoryRequest(BaseModel):
     category_id: str
     user_id: str
 
+class UpdateCategoryNameRequest(BaseModel):
+    category_id: str
+    user_id: str
+    name: str
+
 # Category Methods
 @router.post("/get-categories")
 async def get_categories(request: UserIDRequest):
@@ -205,6 +210,30 @@ async def create_category(category: Category):
     except Exception as e:
         # logger.error("Failed to create category: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to create category: {str(e)}")
+
+@router.post("/update-category-name")
+async def update_category_name(request: UpdateCategoryNameRequest):
+    try:
+        # Verify the category exists and belongs to the user
+        category_ref = db.collection("categories").document(request.category_id)
+        category_doc = category_ref.get()
+        
+        if not category_doc.exists:
+            raise HTTPException(status_code=404, detail="Category not found")
+            
+        category_data = category_doc.to_dict()
+        if category_data.get("user_id") != request.user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to update this category")
+        
+        # Update the category name
+        category_ref.update({"name": request.name})
+        
+        return {"message": "Category name updated successfully"}
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update category name: {str(e)}")
 
 @router.post("/delete-category")
 async def delete_category(request: DeleteCategoryRequest):

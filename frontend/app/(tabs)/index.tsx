@@ -61,20 +61,8 @@ export default function Tab() {
     return allocation ? allocation.allocated : 0;
   };
 
-  const handleDeleteCategory = async (category: Category) => {
-    if (!user) return;
-
-    if (Platform.OS === 'web') {
-      const confirmDelete = window.confirm(`Are you sure you want to delete "${category.name}"?`);
-      if (confirmDelete) {
-        try {
-          await deleteCategory(user.uid, category.id);
-          fetchAllocated();
-        } catch (error: any) {
-          window.alert(error.message || "Cannot delete category. It may have transactions or assignments associated with it.");
-        }
-      }
-    } else {
+  const handleCategoryDelete = (category: Category) => {
+    if (user) {
       Alert.alert(
         "Delete Category",
         `Are you sure you want to delete "${category.name}"?`,
@@ -99,6 +87,13 @@ export default function Tab() {
       );
     }
   };
+
+  const handleCategoryNameUpdate = (categoryId: string, newName: string) => {
+    // This will trigger a re-render of the categories from the context
+    // The useCategories hook should automatically refresh the categories
+    fetchAllocated();
+  };
+
   const renderItem = ({ item }: { item: Category }) => {
     const allocatedAmount = getAllocatedAmount(item.id);
     return (
@@ -126,13 +121,13 @@ export default function Tab() {
             </TouchableOpacity>
           </View>
           <View style={styles.valuesContainer}>
-            <Text style={styles.value}>Allocated: ${allocatedAmount.toFixed(2)}</Text>
-            <Text style={styles.value}>Available: ${item.available.toFixed(2)}</Text>
+            <Text style={styles.value}>Allocated: {allocatedAmount >= 0 ? '$' : '-$'}{Math.abs(allocatedAmount).toFixed(2)}</Text>
+            <Text style={[styles.value, item.available < 0 && styles.negativeValue]}>Available: {item.available >= 0 ? '$' : '-$'}{Math.abs(item.available).toFixed(2)}</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.deleteButton, Platform.OS === 'web' && styles.webDeleteButton]}
-          onPress={() => handleDeleteCategory(item)}
+          onPress={() => handleCategoryDelete(item)}
           role="button"
           aria-label={`Delete ${item.name} category`}
         >
@@ -194,6 +189,7 @@ export default function Tab() {
         onClose={() => setInfoModalVisible(false)}
         startDate={startDate}
         endDate={endDate}
+        onCategoryNameUpdate={handleCategoryNameUpdate}
       />
     </SafeAreaView>
   );
@@ -241,6 +237,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginHorizontal: 8,
+  },
+  negativeValue: {
+    color: 'red',
   },
   deleteButton: {
     padding: 8,

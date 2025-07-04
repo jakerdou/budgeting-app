@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, TextInput, Alert } from 'react-native';
 import { Category } from '@/types';
 import CategoryGoalTab from './CategoryGoalTab';
 import CategoryTransactionsTab from './CategoryTransactionsTab';
 import { useAuth } from '@/context/AuthProvider';
+import { updateCategoryName } from '@/services/categories';
 
 interface CategoryInfoModalProps {
   visible: boolean;
@@ -11,13 +12,59 @@ interface CategoryInfoModalProps {
   onClose: () => void;
   startDate: string;
   endDate: string;
+  onCategoryNameUpdate?: (categoryId: string, newName: string) => void;
 }
 
-const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category, onClose, startDate, endDate }) => {
+const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category, onClose, startDate, endDate, onCategoryNameUpdate }) => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('goals');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [currentDisplayName, setCurrentDisplayName] = useState(category?.name || '');
+  
+  // Update display name when category prop changes - must be before early return
+  React.useEffect(() => {
+    if (category) {
+      setCurrentDisplayName(category.name);
+    }
+  }, [category?.name]);
   
   if (!category) return null;
+
+  const handleEditNameStart = () => {
+    setEditedName(currentDisplayName);
+    setIsEditingName(true);
+  };
+
+  const handleEditNameCancel = () => {
+    setIsEditingName(false);
+    setEditedName('');
+  };
+
+  const handleEditNameSave = async () => {
+    if (!editedName.trim()) {
+      Alert.alert('Error', 'Category name cannot be empty');
+      return;
+    }
+
+    if (editedName.trim() === currentDisplayName) {
+      setIsEditingName(false);
+      return;
+    }
+
+    setIsSavingName(true);
+    try {
+      await updateCategoryName(user?.uid || '', category.id, editedName.trim());
+      setCurrentDisplayName(editedName.trim()); // Update local display name immediately
+      onCategoryNameUpdate?.(category.id, editedName.trim());
+      setIsEditingName(false);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update category name');
+    } finally {
+      setIsSavingName(false);
+    }
+  };
   
   return (
     <Modal
@@ -29,7 +76,33 @@ const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category
       <View style={styles.centeredView}>
         <View style={styles.modalView}>
           <View style={styles.header}>
-            <Text style={styles.title}>{category.name} Details</Text>
+            <View style={styles.titleContainer}>
+              {isEditingName ? (
+                <View style={styles.editingContainer}>
+                  <TextInput
+                    style={styles.editInput}
+                    value={editedName}
+                    onChangeText={setEditedName}
+                    autoFocus
+                    onSubmitEditing={handleEditNameSave}
+                    placeholder="Category name"
+                  />
+                  <TouchableOpacity onPress={handleEditNameSave} style={styles.saveButton} disabled={isSavingName}>
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleEditNameCancel} style={styles.cancelButton}>
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.titleRow}>
+                  <Text style={styles.title}>{currentDisplayName}</Text>
+                  <TouchableOpacity onPress={handleEditNameStart} style={styles.editButton}>
+                    <Text style={styles.editIcon}>✎</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>×</Text>
             </TouchableOpacity>
@@ -175,6 +248,59 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  editIcon: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: 'normal',
+  },
+  editingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  editInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    padding: 8,
+    fontSize: 16,
+    marginRight: 8,
+  },
+  saveButton: {
+    backgroundColor: '#007BFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  saveButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  cancelButton: {
+    backgroundColor: '#6c757d',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontSize: 14,
     fontWeight: 'bold',
   },
 });
