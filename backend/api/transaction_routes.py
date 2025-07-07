@@ -171,7 +171,7 @@ async def create_transaction(transaction: Transaction):
 @router.post("/delete-transaction")
 async def delete_transaction(request: DeleteTransactionRequest):
     try:
-        # logger.info("Deleting transaction with ID: %s for user_id: %s", request.transaction_id, request.user_id)
+        # print(f"Deleting transaction {request.transaction_id} for user {request.user_id}")
         
         transaction_ref = db.collection("transactions").document(request.transaction_id)
         transaction_doc = transaction_ref.get()
@@ -180,25 +180,31 @@ async def delete_transaction(request: DeleteTransactionRequest):
             raise HTTPException(status_code=404, detail="Transaction not found")
         
         transaction_data = transaction_doc.to_dict()
+        # print(f"Transaction data: amount={transaction_data['amount']}, category_id={transaction_data.get('category_id')}")
         
         if transaction_data["user_id"] != request.user_id:
             raise HTTPException(status_code=403, detail="User ID does not match the transaction")
         
-        category_ref = db.collection("categories").document(transaction_data["category_id"])
-        category_doc = category_ref.get()
-        
-        if not category_doc.exists:
-            raise HTTPException(status_code=404, detail="Category not found")
+        category_id = transaction_data.get("category_id")
+        if category_id:
+            category_ref = db.collection("categories").document(category_id)
+            category_doc = category_ref.get()
+            
+            if not category_doc.exists:
+                raise HTTPException(status_code=404, detail="Category not found")
+            
+            # Update the available amount in the category
+            category_data = category_doc.to_dict()
+            new_available = category_data.get("available", 0.0) - transaction_data["amount"]
+            category_ref.update({"available": new_available})
+            # print(f"Updated category {category_id} available amount to {new_available}")
+        else:
+            print("Transaction has no category - skipping category update")
         
         # Delete the transaction
         transaction_ref.delete()
+        # print(f"Transaction {request.transaction_id} deleted successfully")
         
-        # Update the available amount in the category
-        category_data = category_doc.to_dict()
-        new_available = category_data.get("available", 0.0) - transaction_data["amount"]
-        category_ref.update({"available": new_available})
-        
-        # logger.info("Transaction deleted successfully with ID: %s", request.transaction_id)
         return {"message": "Transaction deleted successfully.", "transaction_id": request.transaction_id}
     except Exception as e:
         # logger.error("Failed to delete transaction: %s", e)

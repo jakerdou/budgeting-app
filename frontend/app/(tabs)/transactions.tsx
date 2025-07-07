@@ -4,11 +4,12 @@ import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Platform, ActionSh
 import { useAuth } from '@/context/AuthProvider';
 import { useCategories } from '@/context/CategoriesProvider';
 import AddTransactionModal from '@/components/transactions/AddTransactionModal';
+import TransactionInfoModal from '@/components/transactions/TransactionInfoModal';
 import TransactionsTabHeader from '@/components/transactions/TransactionsTabHeader';
 import BulkCategorySelectionBar from '@/components/transactions/BulkCategorySelectionBar';
 import { getTransactions, addTransaction, deleteTransaction, updateTransactionCategory, syncPlaidTransactions } from '@/services/transactions';
 import { Transaction } from '@/types';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import DropdownButton from '@/components/DropdownButton';
 import { Picker } from '@react-native-picker/picker';
 import { Checkbox } from 'react-native-paper';
@@ -22,6 +23,8 @@ export default function Tab() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);  // New state for loading more
   const [pendingCategoryChanges, setPendingCategoryChanges] = useState<Record<string, boolean>>({});  const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [selectedInfoTransaction, setSelectedInfoTransaction] = useState<Transaction | null>(null);
   
   // Pagination state
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -158,6 +161,10 @@ export default function Tab() {
       console.log(`Category update success for transaction ${transactionId}`);
       // API call succeeded, clear the pending state
       setPendingCategoryChanges(prev => ({ ...prev, [transactionId]: false }));
+      
+      // Refresh the list to apply current filter - this will automatically handle
+      // removing transactions that no longer match the filter
+      fetchTransactions();
     } catch (error) {
       console.error('Failed to update transaction category', error);
       
@@ -259,7 +266,29 @@ export default function Tab() {
               onPress={() => toggleTransactionSelection(item.id)}
             />
           </View>
-          <Text style={styles.name}>{item.name}</Text>
+          <View style={styles.nameContainer}>
+            <Text style={[
+              styles.name, 
+              !item.category_id ? styles.uncategorizedName : null
+            ]}>
+              {item.name}
+            </Text>
+            <TouchableOpacity 
+              style={styles.infoButton}
+              onPress={() => {
+                setSelectedInfoTransaction(item);
+                setInfoModalVisible(true);
+              }}
+              accessibilityLabel={`Show info for ${item.name}`}
+            >
+              <Ionicons 
+                name="information-circle-outline" 
+                size={22} 
+                color="#007BFF" 
+                accessibilityLabel="Info"
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Right-aligned content */}
@@ -271,6 +300,7 @@ export default function Tab() {
                 selectedValue={currentCategoryName}
                 style={[
                   styles.picker, 
+                  currentCategoryName === 'None' ? styles.nonePickerText : null
                   // pendingCategoryChanges[item.id] ? { opacity: 0.7 } : {}
                 ]}
                 // enabled={!pendingCategoryChanges[item.id]}
@@ -288,7 +318,11 @@ export default function Tab() {
                   }
                 }}
               >
-                <Picker.Item key="none" label="None" value="None" />
+                <Picker.Item 
+                  key="none" 
+                  label="None" 
+                  value="None"
+                />
                 {categories.map((cat) => (
                   <Picker.Item key={cat.id} label={cat.name} value={cat.name} />
                 ))}
@@ -296,7 +330,12 @@ export default function Tab() {
             </View>
           ) : (
             <TouchableOpacity onPress={() => showCategoryOptions(item.id, item.category_id)}>
-              <Text style={styles.value}>{currentCategoryName}</Text>
+              <Text style={[
+                styles.value, 
+                currentCategoryName === 'None' ? styles.noneText : null
+              ]}>
+                {currentCategoryName}
+              </Text>
             </TouchableOpacity>
           )}
           
@@ -336,10 +375,11 @@ export default function Tab() {
   // the filtered results from the API
   const displayedTransactions = transactions;
 
-  console.log('transactions[0]:', transactions[0]);
+  // console.log('transactions[0]:', transactions[0]);
   
   return (
-    <SafeAreaView style={styles.container}>        <TransactionsTabHeader 
+    <SafeAreaView style={styles.container}>        
+    <TransactionsTabHeader 
         onAddTransactionPress={() => setModalVisible(true)}
         onSyncTransactionsPress={fetchNewTransactions}
         isSyncing={isLoading}
@@ -352,10 +392,14 @@ export default function Tab() {
           selectedTransactions={selectedTransactions}
           categories={categories}
           userId={user?.uid}
-          onCategoryUpdateComplete={fetchTransactions}
+          onCategoryUpdateComplete={() => {
+            fetchTransactions();
+            setSelectedTransactions([]); // Clear selection after bulk update
+          }}
           onClearSelection={() => setSelectedTransactions([])}
         />
-      )}        {displayedTransactions.length === 0 ? (
+      )}        
+      {displayedTransactions.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
             {selectedCategoryId === "null"
@@ -406,6 +450,12 @@ export default function Tab() {
         user={user}
         categories={categories}
       />
+      <TransactionInfoModal
+        visible={infoModalVisible}
+        transaction={selectedInfoTransaction}
+        category={selectedInfoTransaction ? categories.find(cat => cat.id === selectedInfoTransaction.category_id) || null : null}
+        onClose={() => setInfoModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -434,10 +484,22 @@ const styles = StyleSheet.create({
   checkboxContainer: {
     marginRight: 10,
   },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   name: {
     fontSize: 18,
     fontWeight: 'bold',
     flex: 1, // Allow name to take available space but be truncated if needed
+  },
+  infoButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  uncategorizedName: {
+    color: '#999', // Grey color for uncategorized transactions
   },
   valuesContainer: {
     flexDirection: 'row',
@@ -475,6 +537,18 @@ const styles = StyleSheet.create({
     height: 40,
     width: 150, // Slightly smaller to better fit in the right-aligned group
     color: '#666',
+  },
+  nonePickerItem: {
+    color: '#bbb', // Lighter grey color for "None" option
+    fontStyle: 'italic',
+  },
+  nonePickerText: {
+    color: '#bbb', // Lighter grey color for "None" in picker
+    fontStyle: 'italic',
+  },
+  noneText: {
+    color: '#bbb', // Lighter grey color for "None" text
+    fontStyle: 'italic',
   },
   emptyContainer: {
     flex: 1,

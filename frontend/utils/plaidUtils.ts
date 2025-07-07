@@ -9,7 +9,6 @@ export const saveLinkTokenToAsyncStorage = async (token: string) => {
 export const getLinkTokenFromAsyncStorage = async (): Promise<string | null> => {
     try {
         const storedToken = await AsyncStorage.getItem('link_token');
-        console.log('Stored token:', storedToken);
         if (storedToken) {
             const { token, expirationTime } = JSON.parse(storedToken);
             if (Date.now() > expirationTime) {

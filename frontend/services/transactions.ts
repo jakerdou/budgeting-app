@@ -19,7 +19,6 @@ export const getTransactions = async (userId: string, categoryId: string | null 
       requestBody.cursor_id = cursorId;
     }
 
-    console.log("Transaction request payload:", requestBody);
 
     const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/get-transactions`, {
       method: 'POST',

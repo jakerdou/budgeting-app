@@ -43,6 +43,11 @@ class UpdateCategoryNameRequest(BaseModel):
     user_id: str
     name: str
 
+class UpdateCategoryGoalRequest(BaseModel):
+    category_id: str
+    user_id: str
+    goal_amount: float
+
 # Category Methods
 @router.post("/get-categories")
 async def get_categories(request: UserIDRequest):
@@ -170,11 +175,40 @@ async def get_allocated(request: CategoriesWithAllocatedRequest):
 
         # print(f"DEBUG - Processed {category_count} categories, returning {len(allocated)} allocation records")
         
+        # Calculate unallocated funds (sum of transactions in unallocated funds category)
+        unallocated_income = 0.0
+        try:
+            # Find the unallocated funds category for this user
+            unallocated_query = db.collection("categories").where("user_id", "==", request.user_id).where("is_unallocated_funds", "==", True).limit(1)
+            unallocated_docs = unallocated_query.stream()
+            
+            unallocated_category = None
+            for doc in unallocated_docs:
+                unallocated_category = doc
+                break
+            
+            if unallocated_category:
+                # Get transactions for the unallocated funds category within the date range
+                next_day_str = get_next_day_str(request.end_date)
+                unallocated_transactions_query = db.collection("transactions").where("category_id", "==", unallocated_category.id).where("date", ">=", request.start_date).where("date", "<", next_day_str)
+                unallocated_transactions_docs = unallocated_transactions_query.stream()
+                
+                # Sum up the transaction amounts (income should be positive)
+                for transaction in unallocated_transactions_docs:
+                    transaction_data = transaction.to_dict()
+                    amount = transaction_data.get("amount", 0.0)
+                    unallocated_income += amount
+                    
+        except Exception as unallocated_error:
+            # Don't fail the entire request if unallocated funds calculation fails
+            print(f"DEBUG - Error calculating unallocated funds: {str(unallocated_error)}")
+            unallocated_income = 0.0
+        
         # Debug the final result structure before returning
-        # print(f"DEBUG - Final response structure: {{'allocated': {allocated}}}")
+        # print(f"DEBUG - Final response structure: {{'allocated': {allocated}, 'unallocated_income': {unallocated_income}}}")
         
         # logger.info("Successfully fetched allocated amounts for user_id: %s", request.user_id)
-        return {"allocated": allocated}
+        return {"allocated": allocated, "unallocated_income": unallocated_income}
     
     except Exception as e:
         # print(f"DEBUG - Exception in get-allocated: {str(e)}")
@@ -234,6 +268,35 @@ async def update_category_name(request: UpdateCategoryNameRequest):
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update category name: {str(e)}")
+
+@router.post("/update-category-goal")
+async def update_category_goal(request: UpdateCategoryGoalRequest):
+    try:
+        # Verify the category exists and belongs to the user
+        category_ref = db.collection("categories").document(request.category_id)
+        category_doc = category_ref.get()
+        
+        if not category_doc.exists:
+            raise HTTPException(status_code=404, detail="Category not found")
+            
+        category_data = category_doc.to_dict()
+        if category_data.get("user_id") != request.user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to update this category")
+        
+        # Validate goal amount
+        if request.goal_amount < 0:
+            raise HTTPException(status_code=400, detail="Goal amount cannot be negative")
+        
+        # Update the category goal amount
+        goal_amount = None if request.goal_amount == 0 else request.goal_amount
+        category_ref.update({"goal_amount": goal_amount})
+        
+        return {"message": "Category goal updated successfully"}
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update category goal: {str(e)}")
 
 @router.post("/delete-category")
 async def delete_category(request: DeleteCategoryRequest):

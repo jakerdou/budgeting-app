@@ -14,6 +14,7 @@ interface BudgetTabHeaderProps {
   setPreviousBudgetPeriodTimeFrame: (budgetPeriod: string, currentStartDate: string, currentEndDate: string, setStartDate: (date: string) => void, setEndDate: (date: string) => void) => void;
   setNextBudgetPeriodTimeFrame: (budgetPeriod: string, currentStartDate: string, currentEndDate: string, setStartDate: (date: string) => void, setEndDate: (date: string) => void) => void;
   unallocatedFunds: Category | null;
+  unallocatedIncome: number;
 }
 
 const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
@@ -27,6 +28,7 @@ const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
   setPreviousBudgetPeriodTimeFrame,
   setNextBudgetPeriodTimeFrame,
   unallocatedFunds,
+  unallocatedIncome,
 }) => {
   return (
     <View style={styles.header}>
@@ -47,7 +49,13 @@ const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
         {unallocatedFunds && (
           <>
             <Text style={styles.headerText}>{unallocatedFunds.name}</Text>
-            <Text style={styles.headerValue}>${unallocatedFunds.available.toFixed(2)}</Text>
+            <Text style={[styles.headerValue, unallocatedFunds.available < 0 && styles.negativeValue]}>
+              {unallocatedFunds.available >= 0 ? '$' : '-$'}{Math.abs(unallocatedFunds.available).toFixed(2)}
+            </Text>
+            <Text style={styles.incomeLabel}>Income This Period:</Text>
+            <Text style={[styles.incomeValue, unallocatedIncome >= 0 ? styles.positiveValue : styles.negativeValue]}>
+              {unallocatedIncome >= 0 ? '$' : '-$'}{Math.abs(unallocatedIncome).toFixed(2)}
+            </Text>
           </>
         )}
       </View>
@@ -80,6 +88,22 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#666',
+  },
+  negativeValue: {
+    color: 'red',
+  },
+  incomeLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  incomeValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  positiveValue: {
+    // color: '#28a745',
   },
 });
 

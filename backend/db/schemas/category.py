@@ -10,6 +10,7 @@ class Category(FirestoreModel):
     user_id: str
     available: float = 0.0
     is_unallocated_funds: bool = False
+    goal_amount: Optional[float] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     @classmethod

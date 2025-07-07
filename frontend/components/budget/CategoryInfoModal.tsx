@@ -13,9 +13,10 @@ interface CategoryInfoModalProps {
   startDate: string;
   endDate: string;
   onCategoryNameUpdate?: (categoryId: string, newName: string) => void;
+  onCategoryGoalUpdate?: (categoryId: string, goalAmount: number | null) => void;
 }
 
-const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category, onClose, startDate, endDate, onCategoryNameUpdate }) => {
+const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category, onClose, startDate, endDate, onCategoryNameUpdate, onCategoryGoalUpdate }) => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('goals');
   const [isEditingName, setIsEditingName] = useState(false);
@@ -124,7 +125,10 @@ const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category
           </View>
             <View style={styles.content}>
             {activeTab === 'goals' ? (
-              <CategoryGoalTab category={category} />
+              <CategoryGoalTab 
+                category={category} 
+                onGoalUpdate={onCategoryGoalUpdate}
+              />
             ) : (
               <CategoryTransactionsTab 
                 category={category} 

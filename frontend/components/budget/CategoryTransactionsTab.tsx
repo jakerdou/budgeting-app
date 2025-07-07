@@ -75,10 +75,11 @@ const CategoryTransactionsTab: React.FC<CategoryTransactionsTabProps> = ({
       </View>      
       <Text style={[
         styles.transactionAmount,
-        Number(item.amount) < 0 ? styles.negativeAmount : styles.positiveAmount
+        parseFloat(item.amount.toString()) > 0 ? styles.positiveAmount : styles.negativeAmount
       ]}>
-        ${Number(item.amount).toFixed(2)}
-        {/* ${Math.abs(Number(item.amount)).toFixed(2)} */}
+        {parseFloat(item.amount.toString()) > 0 
+          ? `+$${item.amount}` 
+          : `$${Math.abs(parseFloat(item.amount.toString())).toFixed(2)}`}
       </Text>
     </View>
   );
@@ -187,10 +188,11 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   positiveAmount: {
-    color: 'green',
+    color: '#28a745', // Green color for positive amounts
+    fontWeight: '600',
   },
   negativeAmount: {
-    color: 'red',
+    color: '#666', // Default color for negative amounts
   },
 });
 

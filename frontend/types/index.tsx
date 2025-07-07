@@ -3,6 +3,7 @@ export type Category = {
     name: string;
     allocated: number;
     available: number;
+    goal_amount?: number;
 };
 
 export type Transaction = {
@@ -13,6 +14,7 @@ export type Transaction = {
     name: string;
     type: string;
     user_id: string;
+    account_name: string;
 };
 
 type Account = {

@@ -7,6 +7,8 @@ import AssignmentModal from '@/components/budget/AssignmentModal';
 import CategoryInfoModal from '@/components/budget/CategoryInfoModal';
 import BudgetTabHeader from '@/components/budget/BudgetTabHeader';
 import { getAllocated, deleteCategory } from '@/services/categories';
+import { createAssignment } from '@/services/assignments';
+import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
 import { Category } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -21,6 +23,7 @@ export default function Tab() {
   const { user } = useAuth();
   const { categories, loading, unallocatedFunds } = useCategories();
   const [allocated, setAllocated] = useState<any[]>([]);
+  const [unallocatedIncome, setUnallocatedIncome] = useState<number>(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [startDate, setStartDate] = useState(''); // Using string dates now
   const [endDate, setEndDate] = useState(''); // Using string dates now
@@ -44,6 +47,7 @@ export default function Tab() {
       try {
         const data = await getAllocated(user.uid, startDate, endDate);
         setAllocated(data.allocated);
+        setUnallocatedIncome(data.unallocated_income || 0);
       } catch (error) {
         console.error('Failed to fetch allocated data', error);
       }
@@ -94,10 +98,68 @@ export default function Tab() {
     fetchAllocated();
   };
 
+  const handleCategoryGoalUpdate = (categoryId: string, goalAmount: number | null) => {
+    // Update the selected category's goal amount immediately
+    if (selectedInfoCategory && selectedInfoCategory.id === categoryId) {
+      setSelectedInfoCategory({
+        ...selectedInfoCategory,
+        goal_amount: goalAmount || undefined
+      });
+    }
+    // Also refresh the categories to ensure everything is in sync
+    fetchAllocated();
+  };
+
+  const handleFixNegativeAvailable = async (category: Category) => {
+    if (category.available >= 0) return;
+    
+    const amountToAllocate = Math.abs(category.available);
+    const assignment = {
+      amount: amountToAllocate,
+      user_id: user?.uid || '',
+      category_id: category.id,
+      date: formatDateToYYYYMMDD(new Date()),
+    };
+
+    try {
+      await createAssignment(assignment);
+      fetchAllocated();
+    } catch (error) {
+      console.error('Error fixing negative available:', error);
+    }
+  };
+
+  const handleAllocateToGoal = async (category: Category) => {
+    if (!category.goal_amount) return;
+    
+    const allocatedAmount = getAllocatedAmount(category.id);
+    const shortfall = category.goal_amount - allocatedAmount;
+    
+    if (shortfall <= 0) return;
+    
+    const assignment = {
+      amount: shortfall,
+      user_id: user?.uid || '',
+      category_id: category.id,
+      date: formatDateToYYYYMMDD(new Date()),
+    };
+
+    try {
+      await createAssignment(assignment);
+      fetchAllocated();
+    } catch (error) {
+      console.error('Error allocating to goal:', error);
+    }
+  };
+
   const renderItem = ({ item }: { item: Category }) => {
     const allocatedAmount = getAllocatedAmount(item.id);
+    const hasNegativeAvailable = item.available < 0;
+    const hasGoalShortfall = item.goal_amount && allocatedAmount < item.goal_amount;
+    
     return (
       <View style={styles.item}>
+        
         <TouchableOpacity
           style={styles.categoryContent}
           onPress={() => setSelectedCategory(item)}
@@ -120,11 +182,38 @@ export default function Tab() {
               />
             </TouchableOpacity>
           </View>
+          
           <View style={styles.valuesContainer}>
+            {/* Quick action buttons */}
+            <View style={styles.actionButtons}>
+              {hasNegativeAvailable && (
+                <TouchableOpacity
+                  style={styles.fixButton}
+                  onPress={() => handleFixNegativeAvailable(item)}
+                  accessibilityLabel={`Fix negative available for ${item.name}`}
+                >
+                  <Ionicons name="add-circle" size={20} color="#FF6B6B" />
+                  <Text style={styles.fixButtonText}>Fix</Text>
+                </TouchableOpacity>
+              )}
+              
+              {hasGoalShortfall && (
+                <TouchableOpacity
+                  style={styles.goalButton}
+                  onPress={() => handleAllocateToGoal(item)}
+                  accessibilityLabel={`Allocate to goal for ${item.name}`}
+                >
+                  <Ionicons name="flag" size={20} color="#4ECDC4" />
+                  <Text style={styles.goalButtonText}>Goal</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
             <Text style={styles.value}>Allocated: {allocatedAmount >= 0 ? '$' : '-$'}{Math.abs(allocatedAmount).toFixed(2)}</Text>
             <Text style={[styles.value, item.available < 0 && styles.negativeValue]}>Available: {item.available >= 0 ? '$' : '-$'}{Math.abs(item.available).toFixed(2)}</Text>
           </View>
         </TouchableOpacity>
+        
         <TouchableOpacity
           style={[styles.deleteButton, Platform.OS === 'web' && styles.webDeleteButton]}
           onPress={() => handleCategoryDelete(item)}
@@ -158,6 +247,7 @@ export default function Tab() {
         setPreviousBudgetPeriodTimeFrame={setPreviousBudgetPeriodTimeFrame}
         setNextBudgetPeriodTimeFrame={setNextBudgetPeriodTimeFrame}
         unallocatedFunds={unallocatedFunds}
+        unallocatedIncome={unallocatedIncome}
       />
       {categories.length > 0 && (
         <FlatList
@@ -190,6 +280,7 @@ export default function Tab() {
         startDate={startDate}
         endDate={endDate}
         onCategoryNameUpdate={handleCategoryNameUpdate}
+        onCategoryGoalUpdate={handleCategoryGoalUpdate}
       />
     </SafeAreaView>
   );
@@ -240,6 +331,43 @@ const styles = StyleSheet.create({
   },
   negativeValue: {
     color: 'red',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    marginHorizontal: 8,
+    gap: 8,
+  },
+  fixButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFE5E5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+  },
+  fixButtonText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  goalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E5F9F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4ECDC4',
+  },
+  goalButtonText: {
+    color: '#4ECDC4',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   deleteButton: {
     padding: 8,
