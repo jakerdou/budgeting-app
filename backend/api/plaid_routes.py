@@ -78,7 +78,7 @@ async def get_link_token():
         )
         # Create link token
         response = client.link_token_create(request)
-        logger.info(f"Link token created: {response.link_token}")
+        # logger.info(f"Link token created: {response.link_token}")
 
         return {"link_token": response.link_token}
     

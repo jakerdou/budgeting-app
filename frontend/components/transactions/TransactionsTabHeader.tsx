@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Button, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native';
 import BankLinkButtonIOS from './BankLinkButtonIOS';
 import BankLinkButtonWeb from './BankLinkButtonWeb';
 import { Picker } from '@react-native-picker/picker';
@@ -55,9 +55,8 @@ const TransactionsTabHeader: React.FC<TransactionsTabHeaderProps> = ({
           <View style={styles.pickerContainer}>
             <Picker
               selectedValue={selectedValue}
-              style={[styles.picker, Platform.OS === 'web' ? { height: 35 } : {}]}
+              style={styles.picker}
               onValueChange={handleValueChange}
-              itemStyle={Platform.OS === 'web' ? { fontSize: 14 } : {}}
             >
               <Picker.Item key="all" label="All" value="All" />
               <Picker.Item key="uncategorized" label="Uncategorized" value="Uncategorized" />
@@ -80,7 +79,12 @@ const TransactionsTabHeader: React.FC<TransactionsTabHeaderProps> = ({
             {isSyncing ? 'Syncing...' : 'Sync Transactions'}
           </Text>
         </TouchableOpacity>
-        <Button title="Add Transaction" onPress={onAddTransactionPress} />
+        <TouchableOpacity 
+          style={styles.addButton} 
+          onPress={onAddTransactionPress}
+        >
+          <Text style={styles.addButtonText}>Add Transaction</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -114,16 +118,24 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   pickerContainer: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
     overflow: 'hidden',
-    minWidth: 150,
+    minWidth: 160,
   },
   picker: {
-    height: 35,
-    width: 150,
-    color: '#333',
+    height: 40,
+    width: 160,
+    color: '#374151',
+    fontSize: 15,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -140,6 +152,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#cccccc',
   },
   syncButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  addButton: {
+    backgroundColor: '#007BFF',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  addButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',

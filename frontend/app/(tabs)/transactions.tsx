@@ -9,10 +9,11 @@ import TransactionsTabHeader from '@/components/transactions/TransactionsTabHead
 import BulkCategorySelectionBar from '@/components/transactions/BulkCategorySelectionBar';
 import { getTransactions, addTransaction, deleteTransaction, updateTransactionCategory, syncPlaidTransactions } from '@/services/transactions';
 import { Transaction } from '@/types';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import DropdownButton from '@/components/DropdownButton';
 import { Picker } from '@react-native-picker/picker';
 import { Checkbox } from 'react-native-paper';
+import ConfirmationModal from '@/components/budget/ConfirmationModal';
 
 export default function Tab() {
   const { user } = useAuth();
@@ -25,6 +26,8 @@ export default function Tab() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [selectedInfoTransaction, setSelectedInfoTransaction] = useState<Transaction | null>(null);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   
   // Pagination state
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -101,37 +104,30 @@ export default function Tab() {
     fetchTransactions();
   }, [user, selectedCategoryId]);
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return `${(date.getUTCMonth() + 1).toString().padStart(2, '0')}-${date.getUTCDate().toString().padStart(2, '0')}-${date.getUTCFullYear().toString().slice(-2)}`;
+  const handleTransactionDelete = (transaction: Transaction) => {
+    setTransactionToDelete(transaction);
+    setDeleteConfirmVisible(true);
   };
 
-  const handleDeleteTransaction = async (transactionId: string) => {
-    try {
-      await deleteTransaction(user?.uid || '', transactionId);
-      setTransactions(transactions.filter(transaction => transaction.id !== transactionId));
-    } catch (error) {
-      console.error('Failed to delete transaction', error);
-    }
-  };
-
-  const showMenu = (transactionId: string) => {
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Are you sure you want to delete this transaction?');
-      if (confirmed) {
-        handleDeleteTransaction(transactionId);
+  const confirmTransactionDelete = async () => {
+    if (user && transactionToDelete) {
+      try {
+        await deleteTransaction(user.uid, transactionToDelete.id);
+        setTransactions(transactions.filter(transaction => transaction.id !== transactionToDelete.id));
+        setDeleteConfirmVisible(false);
+        setTransactionToDelete(null);
+      } catch (error) {
+        console.error('Failed to delete transaction', error);
+        setDeleteConfirmVisible(false);
+        setTransactionToDelete(null);
+        Alert.alert('Error', 'Failed to delete transaction');
       }
-    } else {
-      Alert.alert(
-        'Transaction Options',
-        '',
-        [
-          { text: 'Delete transaction', onPress: () => handleDeleteTransaction(transactionId) },
-          { text: 'Cancel', style: 'cancel' },
-        ],
-        { cancelable: true }
-      );
     }
+  };
+
+  const cancelTransactionDelete = () => {
+    setDeleteConfirmVisible(false);
+    setTransactionToDelete(null);
   };  
   const handleChangeCategory = async (transactionId: string, newCategoryId: string) => {
     // Find the transaction to update
@@ -257,7 +253,10 @@ export default function Tab() {
     const categoryOptions = categories.map(cat => cat.name);
     const currentCategoryName = item.category_id ? (category ? category.name : 'Unknown') : 'None';      
     return (
-      <View style={styles.item}>
+      <View style={[
+        styles.item,
+        !item.category_id ? styles.uncategorizedItem : null
+      ]}>
         {/* Left-aligned content */}
         <View style={styles.leftContent}>
           <View style={styles.checkboxContainer}>
@@ -293,7 +292,8 @@ export default function Tab() {
 
         {/* Right-aligned content */}
         <View style={styles.valuesContainer}>
-          <Text style={styles.value}>{formatDate(item.date)}</Text>            
+          <Text style={styles.value}>{item.date}</Text>        
+          {/* <Text style={{...styles.value, ...(currentCategoryName === 'None' ? styles.noneText : null)}}>{item.date}</Text>         */}
           {Platform.OS === 'web' ? (            
             <View style={styles.categoryContainer}>
               <Picker
@@ -332,7 +332,7 @@ export default function Tab() {
             <TouchableOpacity onPress={() => showCategoryOptions(item.id, item.category_id)}>
               <Text style={[
                 styles.value, 
-                currentCategoryName === 'None' ? styles.noneText : null
+                // currentCategoryName === 'None' ? styles.noneText : null
               ]}>
                 {currentCategoryName}
               </Text>
@@ -341,14 +341,25 @@ export default function Tab() {
           
           <Text style={[
             styles.value, 
-            parseFloat(item.amount.toString()) > 0 ? styles.positiveAmount : styles.negativeAmount
+            parseFloat(item.amount.toString()) > 0 ? styles.positiveAmount : styles.negativeAmount,
+            // currentCategoryName === 'None' ? styles.noneText : null
           ]}>
             {parseFloat(item.amount.toString()) > 0 
               ? `+$${item.amount}` 
               : `$${Math.abs(parseFloat(item.amount.toString())).toFixed(2)}`}
           </Text>
-          <TouchableOpacity onPress={() => showMenu(item.id)}>
-            <MaterialIcons name="more-vert" size={24} color="black" />
+          <TouchableOpacity
+            style={[styles.deleteButton, Platform.OS === 'web' && styles.webDeleteButton]}
+            onPress={() => handleTransactionDelete(item)}
+            role="button"
+            aria-label={`Delete ${item.name} transaction`}
+          >
+            <Ionicons 
+              name="trash-outline" 
+              size={24} 
+              color="red" 
+              accessibilityLabel="Delete"
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -456,6 +467,16 @@ export default function Tab() {
         category={selectedInfoTransaction ? categories.find(cat => cat.id === selectedInfoTransaction.category_id) || null : null}
         onClose={() => setInfoModalVisible(false)}
       />
+      <ConfirmationModal
+        visible={deleteConfirmVisible}
+        title="Delete Transaction"
+        message={`Are you sure you want to delete "${transactionToDelete?.name}"?`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmStyle="destructive"
+        onConfirm={confirmTransactionDelete}
+        onCancel={cancelTransactionDelete}
+      />
     </SafeAreaView>
   );
 }
@@ -475,6 +496,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  uncategorizedItem: {
+    backgroundColor: '#fffbf0', // Light yellow background for uncategorized transactions
   },
   leftContent: {
     flexDirection: 'row',
@@ -535,15 +559,26 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 40,
-    width: 150, // Slightly smaller to better fit in the right-aligned group
-    color: '#666',
+    width: 170,
+    color: '#374151',
+    fontSize: 15,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
   },
   nonePickerItem: {
     color: '#bbb', // Lighter grey color for "None" option
     fontStyle: 'italic',
   },
   nonePickerText: {
-    color: '#bbb', // Lighter grey color for "None" in picker
+    // color: '#bbb', // Lighter grey color for "None" in picker
     fontStyle: 'italic',
   },
   noneText: {
@@ -599,5 +634,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: 16,
     fontStyle: 'italic',
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 10,
+  },
+  webDeleteButton: {
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

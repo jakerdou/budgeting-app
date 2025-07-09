@@ -5,6 +5,7 @@ import { useCategories } from '@/context/CategoriesProvider';
 import AddCategoryModal from '@/components/budget/AddCategoryModal';
 import AssignmentModal from '@/components/budget/AssignmentModal';
 import CategoryInfoModal from '@/components/budget/CategoryInfoModal';
+import ConfirmationModal from '@/components/budget/ConfirmationModal';
 import BudgetTabHeader from '@/components/budget/BudgetTabHeader';
 import { getAllocated, deleteCategory } from '@/services/categories';
 import { createAssignment } from '@/services/assignments';
@@ -31,6 +32,10 @@ export default function Tab() {
   const [budgetPeriod, setBudgetPeriod] = useState(user?.preferences.budget_period);
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [selectedInfoCategory, setSelectedInfoCategory] = useState<Category | null>(null);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     if (budgetPeriod === 'monthly') {
@@ -66,30 +71,32 @@ export default function Tab() {
   };
 
   const handleCategoryDelete = (category: Category) => {
+    console.log('Deleting category:', category, user);
     if (user) {
-      Alert.alert(
-        "Delete Category",
-        `Are you sure you want to delete "${category.name}"?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                await deleteCategory(user.uid, category.id);
-                fetchAllocated();
-              } catch (error: any) {
-                Alert.alert(
-                  "Cannot Delete Category",
-                  error.message || "This category may have transactions or assignments associated with it."
-                );
-              }
-            }
-          }
-        ]
-      );
+      setCategoryToDelete(category);
+      setDeleteConfirmVisible(true);
     }
+  };
+
+  const confirmCategoryDelete = async () => {
+    if (user && categoryToDelete) {
+      try {
+        await deleteCategory(user.uid, categoryToDelete.id);
+        fetchAllocated();
+        setDeleteConfirmVisible(false);
+        setCategoryToDelete(null);
+      } catch (error: any) {
+        setDeleteConfirmVisible(false);
+        setCategoryToDelete(null);
+        setErrorMessage(error.message || "This category may have transactions or assignments associated with it.");
+        setErrorModalVisible(true);
+      }
+    }
+  };
+
+  const cancelCategoryDelete = () => {
+    setDeleteConfirmVisible(false);
+    setCategoryToDelete(null);
   };
 
   const handleCategoryNameUpdate = (categoryId: string, newName: string) => {
@@ -248,6 +255,7 @@ export default function Tab() {
         setNextBudgetPeriodTimeFrame={setNextBudgetPeriodTimeFrame}
         unallocatedFunds={unallocatedFunds}
         unallocatedIncome={unallocatedIncome}
+        onAddCategoryPress={() => setModalVisible(true)}
       />
       {categories.length > 0 && (
         <FlatList
@@ -257,9 +265,6 @@ export default function Tab() {
           contentContainerStyle={styles.listContent}
         />
       )}
-      <View style={styles.footer}>
-        <Button title="Add Category" onPress={() => setModalVisible(true)} />
-      </View>
       <AddCategoryModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
@@ -281,6 +286,25 @@ export default function Tab() {
         endDate={endDate}
         onCategoryNameUpdate={handleCategoryNameUpdate}
         onCategoryGoalUpdate={handleCategoryGoalUpdate}
+      />
+      <ConfirmationModal
+        visible={deleteConfirmVisible}
+        title="Delete Category"
+        message={`Are you sure you want to delete "${categoryToDelete?.name}"?`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmStyle="destructive"
+        onConfirm={confirmCategoryDelete}
+        onCancel={cancelCategoryDelete}
+      />
+      <ConfirmationModal
+        visible={errorModalVisible}
+        title="Cannot Delete Category"
+        message={errorMessage}
+        confirmText="OK"
+        cancelText=""
+        onConfirm={() => setErrorModalVisible(false)}
+        onCancel={() => setErrorModalVisible(false)}
       />
     </SafeAreaView>
   );
@@ -378,10 +402,5 @@ const styles = StyleSheet.create({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  footer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
   },
 });

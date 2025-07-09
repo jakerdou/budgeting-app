@@ -56,7 +56,7 @@ async def get_transactions(request: UserIDRequest):
         
         # If a category_id is provided, add that filter
         if request.category_id:
-            logger.info(f"Filtering transactions by category_id: {request.category_id}")
+            # logger.info(f"Filtering transactions by category_id: {request.category_id}")
             
             # Special case for handling "null" category - find transactions with no category
             if request.category_id == "null":

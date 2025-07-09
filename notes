@@ -1,13 +1,9 @@
-to make mvp:
-    make ui a bit better
-        2 - create wireframes
-        3 - enact change >:)
-
-    implement pagination for transactions
-
+make uncategorized the default filter by category, make it so that the distinction between all and uncategorized isn't actual null and a string "null"
+be able to change transaction dates
+maybe look into only using one confirmation modal in index.tsx
+make profile page look better
 
 less important
-    go through index.tsx and datepickers and rename variables maybe to make it less confusing, different things are called budget period and pay period
 
     make it so that users can't sign up if the create-user endpoint returns an error
 
@@ -17,18 +13,12 @@ less important
 
     right now we get categories in the frontend in the categories provider, then we call the endpoint to get allocated backend endpoint and then pair them in the frontend, maybe just get categories as a whole form the backend, idk
 
-    maybe make frontend display amount of unallocated funds you have from the current budget period (basically the sum of the transactions assigned to unallocated funds category for that period of time)
-
-    make add transaction button a plus icon
 
     add color stylings
 
     handle case where start date is after current date
 
     rename top level api folder
-
-    show no transactions message when there are none
-
 
 
 to be able to activate venv in windows - Set-ExecutionPolicy RemoteSigned -Scope CurrentUser

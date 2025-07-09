@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { usePlaidLink } from 'react-plaid-link';
 import { getLinkTokenFromAsyncStorage, saveLinkTokenToAsyncStorage } from '@/utils/plaidUtils'; // Import modified functions
 import { getLinkToken, exchangePublicToken } from '@/services/plaid';
@@ -67,12 +67,13 @@ const BankLinkButton: React.FC = () => {
       {loading ? (
         <ActivityIndicator size="large" color="#0000ff" />
       ) : linkToken ? (
-        <Button
-          title="Link Account"
+        <TouchableOpacity
+          style={[styles.button, !ready && styles.buttonDisabled]}
           onPress={() => open()}
           disabled={!ready}
-          color="#007bff"
-        />
+        >
+          <Text style={styles.buttonText}>Link Account</Text>
+        </TouchableOpacity>
       ) : (
         <ActivityIndicator size="large" color="#0000ff" />
       )}
@@ -83,11 +84,25 @@ const BankLinkButton: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 10,
+    // padding: 10,
     justifyContent: 'center',
     alignItems: 'center',
     maxWidth: 300,
     alignSelf: 'center',
+  },
+  button: {
+    backgroundColor: '#007BFF',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    backgroundColor: '#cccccc',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   card: {
     width: 'auto',

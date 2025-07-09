@@ -319,12 +319,18 @@ async def delete_category(request: DeleteCategoryRequest):
         if transactions:
             raise HTTPException(status_code=400, detail="Cannot delete category with associated transactions")
         
-        # Check if any assignments use this category
+        # Check if category has non-zero available amount
+        available_amount = category_data.get("available", 0.0)
+        if available_amount != 0:
+            raise HTTPException(status_code=400, detail="Cannot delete category with non-zero available amount. Please allocate or move the funds first.")
+        
+        # Delete all assignments associated with this category
         assignments_query = db.collection("assignments").where("category_id", "==", request.category_id)
         assignments = list(assignments_query.stream())
         
-        if assignments:
-            raise HTTPException(status_code=400, detail="Cannot delete category with associated assignments")
+        # Delete each assignment
+        for assignment_doc in assignments:
+            assignment_doc.reference.delete()
         
         # Delete the category
         category_ref.delete()

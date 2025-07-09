@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import DatePickers from '@/components/budget/DatePickers';
 import { Category } from '@/types';
 
@@ -15,6 +15,7 @@ interface BudgetTabHeaderProps {
   setNextBudgetPeriodTimeFrame: (budgetPeriod: string, currentStartDate: string, currentEndDate: string, setStartDate: (date: string) => void, setEndDate: (date: string) => void) => void;
   unallocatedFunds: Category | null;
   unallocatedIncome: number;
+  onAddCategoryPress: () => void;
 }
 
 const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
@@ -29,6 +30,7 @@ const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
   setNextBudgetPeriodTimeFrame,
   unallocatedFunds,
   unallocatedIncome,
+  onAddCategoryPress,
 }) => {
   return (
     <View style={styles.header}>
@@ -45,9 +47,15 @@ const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
           setNextBudgetPeriodTimeFrame={setNextBudgetPeriodTimeFrame}
         />
       </View>
-      <View style={styles.unallocatedContainer}>
+      <View style={styles.rightContainer}>
+        <TouchableOpacity 
+          style={styles.addButton} 
+          onPress={onAddCategoryPress}
+        >
+          <Text style={styles.addButtonText}>Add Category</Text>
+        </TouchableOpacity>
         {unallocatedFunds && (
-          <>
+          <View style={styles.unallocatedContainer}>
             <Text style={styles.headerText}>{unallocatedFunds.name}</Text>
             <Text style={[styles.headerValue, unallocatedFunds.available < 0 && styles.negativeValue]}>
               {unallocatedFunds.available >= 0 ? '$' : '-$'}{Math.abs(unallocatedFunds.available).toFixed(2)}
@@ -56,7 +64,7 @@ const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
             <Text style={[styles.incomeValue, unallocatedIncome >= 0 ? styles.positiveValue : styles.negativeValue]}>
               {unallocatedIncome >= 0 ? '$' : '-$'}{Math.abs(unallocatedIncome).toFixed(2)}
             </Text>
-          </>
+          </View>
         )}
       </View>
     </View>
@@ -73,12 +81,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  unallocatedContainer: {
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
   datePickersContainer: {
     flexDirection: 'row',
+  },
+  rightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  unallocatedContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
   },
   headerText: {
     fontSize: 20,
@@ -104,6 +117,17 @@ const styles = StyleSheet.create({
   },
   positiveValue: {
     // color: '#28a745',
+  },
+  addButton: {
+    backgroundColor: '#007BFF',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 

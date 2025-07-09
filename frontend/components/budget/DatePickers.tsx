@@ -33,9 +33,9 @@ const DatePickers: React.FC<DatePickersProps> = ({ startDate, endDate, setStartD
   };
 
   return (
-    <View>
+    <View style={styles.datePickerContainer}>
       <View style={styles.budgetPeriodContainer}>
-        <Text>Budget Period:</Text>
+        <Text style={styles.budgetPeriodLabel}>Budget Period:</Text>
         {Platform.OS === 'ios' ? (
           <DropdownButton
             options={budgetPeriods}
@@ -91,11 +91,27 @@ const DatePickers: React.FC<DatePickersProps> = ({ startDate, endDate, setStartD
 };
 
 const styles = StyleSheet.create({
+  datePickerContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   budgetPeriodContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 12,
+  },
+  budgetPeriodLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
   },
   dateDisplayContainer: {
     flexDirection: 'row',
@@ -111,9 +127,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   picker: {
-    height: 50,
-    width: 150,
-    marginLeft: 8,
+    height: 40,
+    width: 160,
+    marginLeft: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    paddingHorizontal: 12,
+    fontSize: 15,
+    color: '#374151',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
   },
   navigationContainer: {
     flexDirection: 'row',
