@@ -9,8 +9,9 @@ import ConfirmationModal from '@/components/budget/ConfirmationModal';
 import BudgetTabHeader from '@/components/budget/BudgetTabHeader';
 import { getAllocated, deleteCategory } from '@/services/categories';
 import { createAssignment } from '@/services/assignments';
+import { getTransactionsForCategory } from '@/services/transactions';
 import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
-import { Category } from '@/types';
+import { Category, Transaction } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import {
   setMonthlyDates,
@@ -24,6 +25,7 @@ export default function Tab() {
   const { user } = useAuth();
   const { categories, loading, unallocatedFunds } = useCategories();
   const [allocated, setAllocated] = useState<any[]>([]);
+  const [spentAmounts, setSpentAmounts] = useState<{[categoryId: string]: number}>({});
   const [unallocatedIncome, setUnallocatedIncome] = useState<number>(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [startDate, setStartDate] = useState(''); // Using string dates now
@@ -59,11 +61,59 @@ export default function Tab() {
     }
   }, [user, startDate, endDate]);
 
+  const calculateSpentAmount = (transactions: Transaction[], startDate: string, endDate: string): number => {
+    if (!startDate || !endDate) return 0;
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    const filteredTransactions = transactions.filter(transaction => {
+      const transactionDate = new Date(transaction.date);
+      return transactionDate >= start && transactionDate <= end;
+    });
+    
+    // Calculate spent amount: negative amounts are spending, positive amounts are refunds/returns
+    const totalSpent = filteredTransactions.reduce((total, transaction) => {
+      const amount = parseFloat(transaction.amount.toString());
+      // If amount is negative, it's spending (add to total)
+      // If amount is positive, it's a refund/return (subtract from total)
+      return total + Math.abs(amount) * (amount < 0 ? 1 : -1);
+    }, 0);
+    
+    // Ensure we don't return negative spent amounts
+    return Math.max(totalSpent);
+  };
+
+  const fetchSpentAmounts = useCallback(async () => {
+    if (!user || !startDate || !endDate) return;
+    
+    const spentData: {[categoryId: string]: number} = {};
+    
+    // Fetch spending for each category
+    await Promise.all(
+      categories.map(async (category) => {
+        if (category.is_unallocated_funds) return;
+        
+        try {
+          const response = await getTransactionsForCategory(user.uid, category.id);
+          const spentAmount = calculateSpentAmount(response.transactions || [], startDate, endDate);
+          spentData[category.id] = spentAmount;
+        } catch (error) {
+          console.error(`Failed to fetch transactions for category ${category.id}:`, error);
+          spentData[category.id] = 0;
+        }
+      })
+    );
+    
+    setSpentAmounts(spentData);
+  }, [user, categories, startDate, endDate]);
+
   useEffect(() => {
     if (startDate && endDate) {
       fetchAllocated();
+      fetchSpentAmounts();
     }
-  }, [fetchAllocated]);
+  }, [fetchAllocated, fetchSpentAmounts]);
 
   const getAllocatedAmount = (categoryId: string) => {
     const allocation = allocated.find((alloc) => alloc.category_id === categoryId);
@@ -83,6 +133,7 @@ export default function Tab() {
       try {
         await deleteCategory(user.uid, categoryToDelete.id);
         fetchAllocated();
+        fetchSpentAmounts();
         setDeleteConfirmVisible(false);
         setCategoryToDelete(null);
       } catch (error: any) {
@@ -103,6 +154,7 @@ export default function Tab() {
     // This will trigger a re-render of the categories from the context
     // The useCategories hook should automatically refresh the categories
     fetchAllocated();
+    fetchSpentAmounts();
   };
 
   const handleCategoryGoalUpdate = (categoryId: string, goalAmount: number | null) => {
@@ -115,6 +167,7 @@ export default function Tab() {
     }
     // Also refresh the categories to ensure everything is in sync
     fetchAllocated();
+    fetchSpentAmounts();
   };
 
   const handleFixNegativeAvailable = async (category: Category) => {
@@ -131,6 +184,7 @@ export default function Tab() {
     try {
       await createAssignment(assignment);
       fetchAllocated();
+      fetchSpentAmounts();
     } catch (error) {
       console.error('Error fixing negative available:', error);
     }
@@ -154,6 +208,7 @@ export default function Tab() {
     try {
       await createAssignment(assignment);
       fetchAllocated();
+      fetchSpentAmounts();
     } catch (error) {
       console.error('Error allocating to goal:', error);
     }
@@ -161,6 +216,7 @@ export default function Tab() {
 
   const renderItem = ({ item }: { item: Category }) => {
     const allocatedAmount = getAllocatedAmount(item.id);
+    const spentAmount = spentAmounts[item.id] || 0;
     const hasNegativeAvailable = item.available < 0;
     const hasGoalShortfall = item.goal_amount && allocatedAmount < item.goal_amount;
     
@@ -217,6 +273,8 @@ export default function Tab() {
             </View>
 
             <Text style={styles.value}>Allocated: {allocatedAmount >= 0 ? '$' : '-$'}{Math.abs(allocatedAmount).toFixed(2)}</Text>
+            {/* <Text style={styles.value}>Spent: ${spentAmount.toFixed(2)}</Text> */}
+            <Text style={styles.value}>Spent: {spentAmount >= 0 ? '$' : '-$'}{Math.abs(spentAmount).toFixed(2)}</Text>
             <Text style={[styles.value, item.available < 0 && styles.negativeValue]}>Available: {item.available >= 0 ? '$' : '-$'}{Math.abs(item.available).toFixed(2)}</Text>
           </View>
         </TouchableOpacity>
@@ -269,14 +327,20 @@ export default function Tab() {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         userId={user?.uid}
-        onNewCategory={() => fetchAllocated()}
+        onNewCategory={() => {
+          fetchAllocated();
+          fetchSpentAmounts();
+        }}
       />        
       <AssignmentModal
         visible={!!selectedCategory}
         onClose={() => setSelectedCategory(null)}
         category={selectedCategory}
         userId={user?.uid || ''}
-        onAssignmentCreated={fetchAllocated}
+        onAssignmentCreated={() => {
+          fetchAllocated();
+          fetchSpentAmounts();
+        }}
       />      
       <CategoryInfoModal 
         visible={infoModalVisible}

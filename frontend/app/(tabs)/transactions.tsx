@@ -158,9 +158,17 @@ export default function Tab() {
       // API call succeeded, clear the pending state
       setPendingCategoryChanges(prev => ({ ...prev, [transactionId]: false }));
       
-      // Refresh the list to apply current filter - this will automatically handle
-      // removing transactions that no longer match the filter
-      fetchTransactions();
+      // Check if the transaction should be removed from current view due to category filter
+      const shouldRemoveFromView = selectedCategoryId !== null && 
+        (selectedCategoryId === "null" ? newCategoryId !== "null" : newCategoryId !== selectedCategoryId);
+      
+      if (shouldRemoveFromView) {
+        // Remove the transaction from the current view without resetting pagination
+        setTransactions(prevTransactions => 
+          prevTransactions.filter(transaction => transaction.id !== transactionId)
+        );
+      }
+      // If no filter is applied or transaction still matches filter, keep it in view with updated category
     } catch (error) {
       console.error('Failed to update transaction category', error);
       
