@@ -3,6 +3,19 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from .db import db
 from backend.db.schemas import Assignment as AssignmentSchema
+import logging
+import os
+
+# Setup logging for assignments
+log_dir = os.path.join(os.path.dirname(__file__), "logs")
+os.makedirs(log_dir, exist_ok=True)
+assignment_logger = logging.getLogger("assignment_logger")
+assignment_logger.setLevel(logging.INFO)
+assignment_handler = logging.FileHandler(os.path.join(log_dir, "assignment.log"))
+assignment_formatter = logging.Formatter('%(asctime)s - %(message)s')
+assignment_handler.setFormatter(assignment_formatter)
+assignment_logger.addHandler(assignment_handler)
+assignment_logger.propagate = False
 
 router = APIRouter()
 
@@ -60,6 +73,9 @@ async def create_assignment(assignment: Assignment):
         category_data = category_doc.to_dict()
         new_category_available = category_data.get("available", 0.0) + assignment.amount
         category_ref.update({"available": new_category_available})
+
+        # Log the assignment
+        assignment_logger.info(f"Assignment created - ID: {assignment_ref.id}, Amount: ${assignment.amount}, Category: '{category_data.get('name', 'Unknown')}' (ID: {assignment.category_id}), New category available: ${new_category_available}")
 
         # logger.info("Assignment created successfully with ID: %s", assignment_ref.id)
         return {"message": "Assignment created successfully.", "assignment_id": assignment_ref.id}

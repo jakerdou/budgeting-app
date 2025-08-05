@@ -2,6 +2,13 @@ make uncategorized the default filter by category, make it so that the distincti
 be able to change transaction dates
 maybe look into only using one confirmation modal in index.tsx
 make profile page look better
+put search bar in transactions page, will need to do this in backend because of pagination it won't search all the transactions. they aren't all loaded in the frontend
+add today button next to date picker that will take you to teh range of dates that includes today
+put more transaction info in the transaction info modal, will need to save in db like just more descriptive fields. theres a problem with some of the transaction names not being descriptive enough e.g. 'aplpay store'
+maybe make it so that the spent amount comes from the backend with the categories, or that we get allocated and spent in same request, this is some tech debt smh but ai can do it so easily
+CHECK VALIDATION ERRORS from db validation check script. check the script itself for accuracy
+
+add splitting transaction amount to different categories
 
 less important
 

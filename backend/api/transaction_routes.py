@@ -6,6 +6,18 @@ from .db import db, NULL_VALUE
 from .plaid_utils import get_plaid_transactions, get_saved_cursor  # Assuming helper functions exist for Plaid API calls
 from backend.db.schemas import Transaction as TransactionSchema
 import logging
+import os
+
+# Setup logging for transactions
+log_dir = os.path.join(os.path.dirname(__file__), "logs")
+os.makedirs(log_dir, exist_ok=True)
+transaction_logger = logging.getLogger("transaction_logger")
+transaction_logger.setLevel(logging.INFO)
+transaction_handler = logging.FileHandler(os.path.join(log_dir, "transaction.log"))
+transaction_formatter = logging.Formatter('%(asctime)s - %(message)s')
+transaction_handler.setFormatter(transaction_formatter)
+transaction_logger.addHandler(transaction_handler)
+transaction_logger.propagate = False
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -158,6 +170,9 @@ async def create_transaction(transaction: Transaction):
             category_data = category_doc.to_dict()
             new_available = category_data.get("available", 0.0) + transaction.amount
             category_ref.update({"available": new_available})
+            
+            # Log transaction creation with category
+            transaction_logger.info(f"Transaction created with category - Transaction: '{transaction.name}' (ID: {transaction_ref.id}), Amount: ${transaction.amount}, Category: '{category_data.get('name', 'Unknown')}' (ID: {transaction.category_id}), New category available: ${new_available}")
         
         # logger.info("Transaction created successfully with ID: %s", transaction_ref.id)
         return {"message": "Transaction created successfully.", "transaction_id": transaction_ref.id}
@@ -293,8 +308,14 @@ async def update_transaction_category(request: UpdateTransactionCategoryRequest)
             new_new_available = new_category_data.get("available", 0.0) + transaction_amount
             new_category_ref.update({"available": new_new_available})
             print(f"Updated new category available amount to {new_new_available}")
+            
+            # Log transaction categorization
+            transaction_logger.info(f"Transaction categorized - Transaction: '{transaction_data.get('name', 'Unknown')}' (ID: {request.transaction_id}), Amount: ${transaction_amount}, New category: '{new_category_data.get('name', 'Unknown')}' (ID: {request.category_id}), New category available: ${new_new_available}")
         else:
             print("Transaction set to have no category - no new category to update")
+            
+            # Log transaction uncategorization
+            transaction_logger.info(f"Transaction uncategorized - Transaction: '{transaction_data.get('name', 'Unknown')}' (ID: {request.transaction_id}), Amount: ${transaction_amount}, Set to no category")
         
         print(f"Transaction category updated successfully for transaction_id: {request.transaction_id}")
         return {"message": "Transaction category updated successfully.", "transaction_id": request.transaction_id}

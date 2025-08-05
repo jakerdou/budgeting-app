@@ -7,11 +7,10 @@ import AssignmentModal from '@/components/budget/AssignmentModal';
 import CategoryInfoModal from '@/components/budget/CategoryInfoModal';
 import ConfirmationModal from '@/components/budget/ConfirmationModal';
 import BudgetTabHeader from '@/components/budget/BudgetTabHeader';
-import { getAllocated, deleteCategory } from '@/services/categories';
+import { getAllocatedAndSpent, deleteCategory } from '@/services/categories';
 import { createAssignment } from '@/services/assignments';
-import { getTransactionsForCategory } from '@/services/transactions';
 import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
-import { Category, Transaction } from '@/types';
+import { Category } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import {
   setMonthlyDates,
@@ -24,8 +23,7 @@ import {
 export default function Tab() {
   const { user } = useAuth();
   const { categories, loading, unallocatedFunds } = useCategories();
-  const [allocated, setAllocated] = useState<any[]>([]);
-  const [spentAmounts, setSpentAmounts] = useState<{[categoryId: string]: number}>({});
+  const [allocatedAndSpent, setAllocatedAndSpent] = useState<{[categoryId: string]: {allocated: number, spent: number}}>({});
   const [unallocatedIncome, setUnallocatedIncome] = useState<number>(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [startDate, setStartDate] = useState(''); // Using string dates now
@@ -49,75 +47,40 @@ export default function Tab() {
     }
   }, [budgetPeriod, user]);
 
-  const fetchAllocated = useCallback(async () => {
+  const fetchAllocatedAndSpent = useCallback(async () => {
     if (user) {
       try {
-        const data = await getAllocated(user.uid, startDate, endDate);
-        setAllocated(data.allocated);
-        setUnallocatedIncome(data.unallocated_income || 0);
+        const data = await getAllocatedAndSpent(user.uid, startDate, endDate);
+        
+        // Transform the array response into an object keyed by category_id
+        const transformedData: {[categoryId: string]: {allocated: number, spent: number}} = {};
+        data.allocated_and_spent?.forEach((item: any) => {
+          transformedData[item.category_id] = {
+            allocated: item.allocated,
+            spent: item.spent
+          };
+        });
+        
+        setAllocatedAndSpent(transformedData);
+        setUnallocatedIncome(data.unallocated_income);
       } catch (error) {
-        console.error('Failed to fetch allocated data', error);
+        console.error('Failed to fetch allocated and spent data', error);
       }
     }
   }, [user, startDate, endDate]);
 
-  const calculateSpentAmount = (transactions: Transaction[], startDate: string, endDate: string): number => {
-    if (!startDate || !endDate) return 0;
-    
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    const filteredTransactions = transactions.filter(transaction => {
-      const transactionDate = new Date(transaction.date);
-      return transactionDate >= start && transactionDate <= end;
-    });
-    
-    // Calculate spent amount: negative amounts are spending, positive amounts are refunds/returns
-    const totalSpent = filteredTransactions.reduce((total, transaction) => {
-      const amount = parseFloat(transaction.amount.toString());
-      // If amount is negative, it's spending (add to total)
-      // If amount is positive, it's a refund/return (subtract from total)
-      return total + Math.abs(amount) * (amount < 0 ? 1 : -1);
-    }, 0);
-    
-    // Ensure we don't return negative spent amounts
-    return Math.max(totalSpent);
-  };
-
-  const fetchSpentAmounts = useCallback(async () => {
-    if (!user || !startDate || !endDate) return;
-    
-    const spentData: {[categoryId: string]: number} = {};
-    
-    // Fetch spending for each category
-    await Promise.all(
-      categories.map(async (category) => {
-        if (category.is_unallocated_funds) return;
-        
-        try {
-          const response = await getTransactionsForCategory(user.uid, category.id);
-          const spentAmount = calculateSpentAmount(response.transactions || [], startDate, endDate);
-          spentData[category.id] = spentAmount;
-        } catch (error) {
-          console.error(`Failed to fetch transactions for category ${category.id}:`, error);
-          spentData[category.id] = 0;
-        }
-      })
-    );
-    
-    setSpentAmounts(spentData);
-  }, [user, categories, startDate, endDate]);
-
   useEffect(() => {
     if (startDate && endDate) {
-      fetchAllocated();
-      fetchSpentAmounts();
+      fetchAllocatedAndSpent();
     }
-  }, [fetchAllocated, fetchSpentAmounts]);
+  }, [fetchAllocatedAndSpent]);
 
   const getAllocatedAmount = (categoryId: string) => {
-    const allocation = allocated.find((alloc) => alloc.category_id === categoryId);
-    return allocation ? allocation.allocated : 0;
+    return allocatedAndSpent[categoryId]?.allocated || 0;
+  };
+
+  const getSpentAmount = (categoryId: string) => {
+    return allocatedAndSpent[categoryId]?.spent || 0;
   };
 
   const handleCategoryDelete = (category: Category) => {
@@ -132,8 +95,7 @@ export default function Tab() {
     if (user && categoryToDelete) {
       try {
         await deleteCategory(user.uid, categoryToDelete.id);
-        fetchAllocated();
-        fetchSpentAmounts();
+        fetchAllocatedAndSpent();
         setDeleteConfirmVisible(false);
         setCategoryToDelete(null);
       } catch (error: any) {
@@ -153,8 +115,7 @@ export default function Tab() {
   const handleCategoryNameUpdate = (categoryId: string, newName: string) => {
     // This will trigger a re-render of the categories from the context
     // The useCategories hook should automatically refresh the categories
-    fetchAllocated();
-    fetchSpentAmounts();
+    fetchAllocatedAndSpent();
   };
 
   const handleCategoryGoalUpdate = (categoryId: string, goalAmount: number | null) => {
@@ -166,8 +127,7 @@ export default function Tab() {
       });
     }
     // Also refresh the categories to ensure everything is in sync
-    fetchAllocated();
-    fetchSpentAmounts();
+    fetchAllocatedAndSpent();
   };
 
   const handleFixNegativeAvailable = async (category: Category) => {
@@ -183,8 +143,7 @@ export default function Tab() {
 
     try {
       await createAssignment(assignment);
-      fetchAllocated();
-      fetchSpentAmounts();
+      fetchAllocatedAndSpent();
     } catch (error) {
       console.error('Error fixing negative available:', error);
     }
@@ -207,8 +166,7 @@ export default function Tab() {
 
     try {
       await createAssignment(assignment);
-      fetchAllocated();
-      fetchSpentAmounts();
+      fetchAllocatedAndSpent();
     } catch (error) {
       console.error('Error allocating to goal:', error);
     }
@@ -216,7 +174,7 @@ export default function Tab() {
 
   const renderItem = ({ item }: { item: Category }) => {
     const allocatedAmount = getAllocatedAmount(item.id);
-    const spentAmount = spentAmounts[item.id] || 0;
+    const spentAmount = getSpentAmount(item.id);
     const hasNegativeAvailable = item.available < 0;
     const hasGoalShortfall = item.goal_amount && allocatedAmount < item.goal_amount;
     
@@ -247,35 +205,48 @@ export default function Tab() {
           </View>
           
           <View style={styles.valuesContainer}>
-            {/* Quick action buttons */}
-            <View style={styles.actionButtons}>
-              {hasNegativeAvailable && (
-                <TouchableOpacity
-                  style={styles.fixButton}
-                  onPress={() => handleFixNegativeAvailable(item)}
-                  accessibilityLabel={`Fix negative available for ${item.name}`}
-                >
-                  <Ionicons name="add-circle" size={20} color="#FF6B6B" />
-                  <Text style={styles.fixButtonText}>Fix</Text>
-                </TouchableOpacity>
-              )}
-              
-              {hasGoalShortfall && (
-                <TouchableOpacity
-                  style={styles.goalButton}
-                  onPress={() => handleAllocateToGoal(item)}
-                  accessibilityLabel={`Allocate to goal for ${item.name}`}
-                >
-                  <Ionicons name="flag" size={20} color="#4ECDC4" />
-                  <Text style={styles.goalButtonText}>Goal</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            <View style={styles.mainValuesRow}>
+              {/* Quick action buttons */}
+              <View style={styles.actionButtons}>
+                {hasNegativeAvailable && (
+                  <TouchableOpacity
+                    style={styles.fixButton}
+                    onPress={() => handleFixNegativeAvailable(item)}
+                    accessibilityLabel={`Fix negative available for ${item.name}`}
+                  >
+                    <Ionicons name="add-circle" size={20} color="#FF6B6B" />
+                    <Text style={styles.fixButtonText}>Fix</Text>
+                  </TouchableOpacity>
+                )}
+                
+                {hasGoalShortfall && (
+                  <TouchableOpacity
+                    style={styles.goalButton}
+                    onPress={() => handleAllocateToGoal(item)}
+                    accessibilityLabel={`Allocate to goal for ${item.name}`}
+                  >
+                    <Ionicons name="flag" size={20} color="#4ECDC4" />
+                    <Text style={styles.goalButtonText}>Goal</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
-            <Text style={styles.value}>Allocated: {allocatedAmount >= 0 ? '$' : '-$'}{Math.abs(allocatedAmount).toFixed(2)}</Text>
-            {/* <Text style={styles.value}>Spent: ${spentAmount.toFixed(2)}</Text> */}
-            <Text style={styles.value}>Spent: {spentAmount >= 0 ? '$' : '-$'}{Math.abs(spentAmount).toFixed(2)}</Text>
-            <Text style={[styles.value, item.available < 0 && styles.negativeValue]}>Available: {item.available >= 0 ? '$' : '-$'}{Math.abs(item.available).toFixed(2)}</Text>
+              <View style={styles.horizontalValuesContainer}>
+                <View style={styles.periodValuesContainer}>
+                  <Text style={[styles.periodLabel]}>This Period:</Text>
+                  <Text style={[styles.periodValue, allocatedAmount < 0 && styles.negativeValue]}>Allocated: {allocatedAmount >= 0 ? '$' : '-$'}{Math.abs(allocatedAmount).toFixed(2)}</Text>
+                  <Text style={[styles.periodValue]}>Spent: {spentAmount >= 0 ? '$' : '-$'}{Math.abs(spentAmount).toFixed(2)}</Text>
+                </View>
+                <View style={[styles.totalValueContainer, { borderLeftColor: item.available >= 0 ? '#28A745' : '#DC3545' }]}>
+                  <Text style={[
+                    styles.totalValue, 
+                    item.available > 0 ? styles.positiveValue : (item.available < 0 ? styles.negativeValue : null)
+                  ]}>
+                    Available: {item.available >= 0 ? '$' : '-$'}{Math.abs(item.available).toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+            </View>
           </View>
         </TouchableOpacity>
         
@@ -328,8 +299,7 @@ export default function Tab() {
         onClose={() => setModalVisible(false)}
         userId={user?.uid}
         onNewCategory={() => {
-          fetchAllocated();
-          fetchSpentAmounts();
+          fetchAllocatedAndSpent();
         }}
       />        
       <AssignmentModal
@@ -338,8 +308,7 @@ export default function Tab() {
         category={selectedCategory}
         userId={user?.uid || ''}
         onAssignmentCreated={() => {
-          fetchAllocated();
-          fetchSpentAmounts();
+          fetchAllocatedAndSpent();
         }}
       />      
       <CategoryInfoModal 
@@ -409,8 +378,55 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   valuesContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  mainValuesRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  horizontalValuesContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  periodValuesContainer: {
+    backgroundColor: '#F8F9FA',
+    padding: 8,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#007BFF',
+    flex: 1,
+    minWidth: 140,
+  },
+  periodLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#007BFF',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  periodValue: {
+    fontSize: 14,
+    color: '#495057',
+    marginVertical: 1,
+  },
+  totalValueContainer: {
+    backgroundColor: '#F8F9FA',
+    padding: 8,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  totalValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
   },
   value: {
     fontSize: 16,
@@ -420,10 +436,14 @@ const styles = StyleSheet.create({
   negativeValue: {
     color: 'red',
   },
+  positiveValue: {
+    color: '#28A745',
+  },
   actionButtons: {
-    flexDirection: 'row',
-    marginHorizontal: 8,
-    gap: 8,
+    flexDirection: 'column',
+    gap: 6,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   },
   fixButton: {
     flexDirection: 'row',

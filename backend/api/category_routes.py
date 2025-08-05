@@ -77,45 +77,10 @@ async def get_categories(request: UserIDRequest):
         # logger.error("Failed to get categories for user_id: %s, error: %s", request.user_id, e)
         raise HTTPException(status_code=500, detail=f"Failed to get categories: %e")
 
-@router.post("/get-categories-with-allocated")
-async def get_categories_with_allocated(request: CategoriesWithAllocatedRequest):
-    try:
-        # logger.info("Fetching categories with allocated amounts for user_id: %s", request.user_id)
-        
-        # Query categories with a `user_id` field equal to `request.user_id`
-        categories_query = db.collection("categories").where("user_id", "==", request.user_id)
-        categories_docs = categories_query.stream()
-
-        # Collect categories into a list, converting each document to a dictionary
-        categories = []
-        for doc in categories_docs:
-            category_data = doc.to_dict()
-            category_data["id"] = doc.id  # Add the category ID to the response
-            
-            # Calculate allocated amount for the category
-            # Using helper function to get the next day for inclusive end date
-            next_day_str = get_next_day_str(request.end_date)
-            assignments_query = db.collection("assignments").where("category_id", "==", doc.id).where("date", ">=", request.start_date).where("date", "<", next_day_str)
-            assignments_docs = assignments_query.stream()
-            print(f"Assignments query for category {doc.id}: {assignments_query}")
-            print(f"Assignments query results: {assignments_docs}")
-            print(f"Using date range: {request.start_date} to {request.end_date} (exclusive upper bound: {next_day_str})")
-            allocated_amount = sum(assignment.to_dict().get("amount", 0.0) for assignment in assignments_docs)
-            
-            category_data["allocated"] = allocated_amount
-            categories.append(category_data)
-
-        # logger.info("Successfully fetched categories with allocated amounts for user_id: %s", request.user_id)
-        return {"categories": categories}
-    
-    except Exception as e:
-        # logger.error("Failed to get categories with allocated amounts for user_id: %s, error: %s", request.user_id, e)
-        raise HTTPException(status_code=500, detail=f"Failed to get categories with allocated amounts: %e")
-
-@router.post("/get-allocated")
-async def get_allocated(request: CategoriesWithAllocatedRequest):
+@router.post("/get-allocated-and-spent")
+async def get_allocated_and_spent(request: CategoriesWithAllocatedRequest):
     try:        # Debug request information
-        # print(f"DEBUG - get-allocated called with user_id: {request.user_id}")
+        # print(f"DEBUG - get-allocated-and-spent called with user_id: {request.user_id}")
         # print(f"DEBUG - Start date: {request.start_date}")
         # print(f"DEBUG - End date: {request.end_date}")
         
@@ -129,14 +94,14 @@ async def get_allocated(request: CategoriesWithAllocatedRequest):
         category_count = 0
         
         # Collect categories into a list, converting each document to a dictionary
-        allocated = []
+        allocated_and_spent = []
         for doc in categories_docs:
             category_count += 1
             category_data = doc.to_dict()
             # print(f"DEBUG - Processing category: {doc.id}, name: {category_data.get('name', 'Unknown')}")
             
-            allocated_data = {}
-            allocated_data["category_id"] = doc.id  # Add the category ID to the response
+            category_result = {}
+            category_result["category_id"] = doc.id  # Add the category ID to the response
             
             # Calculate allocated amount for the category
             # Using helper function to get the next day for inclusive end date
@@ -170,10 +135,36 @@ async def get_allocated(request: CategoriesWithAllocatedRequest):
                 # Fallback to ensure we continue processing
                 allocated_amount = 0.0
                 
-            allocated_data["allocated"] = allocated_amount
-            allocated.append(allocated_data)
+            category_result["allocated"] = allocated_amount
 
-        # print(f"DEBUG - Processed {category_count} categories, returning {len(allocated)} allocation records")
+            # Calculate spent amount for the category (transactions in the time period)
+            spent_amount = 0.0
+            try:
+                # Skip spending calculation for unallocated funds category
+                if not category_data.get("is_unallocated_funds", False):
+                    transactions_query = db.collection("transactions").where("category_id", "==", doc.id).where("date", ">=", request.start_date).where("date", "<", next_day_str)
+                    transactions_docs = transactions_query.stream()
+                    
+                    for transaction in transactions_docs:
+                        transaction_data = transaction.to_dict()
+                        amount = transaction_data.get("amount", 0.0)
+                        # If amount is negative, it's spending (add to total)
+                        # If amount is positive, it's a refund/return (subtract from total)
+                        if amount < 0:
+                            spent_amount += abs(amount)
+                        else:
+                            spent_amount -= amount
+                    
+                    # Allow negative spent amounts (when refunds exceed spending)
+                    
+            except Exception as spent_error:
+                # print(f"DEBUG - Error calculating spent amount: {str(spent_error)}")
+                spent_amount = 0.0
+            
+            category_result["spent"] = spent_amount
+            allocated_and_spent.append(category_result)
+
+        # print(f"DEBUG - Processed {category_count} categories, returning {len(allocated_and_spent)} allocation records")
         
         # Calculate unallocated funds (sum of transactions in unallocated funds category)
         unallocated_income = 0.0
@@ -205,16 +196,16 @@ async def get_allocated(request: CategoriesWithAllocatedRequest):
             unallocated_income = 0.0
         
         # Debug the final result structure before returning
-        # print(f"DEBUG - Final response structure: {{'allocated': {allocated}, 'unallocated_income': {unallocated_income}}}")
+        # print(f"DEBUG - Final response structure: {{'allocated_and_spent': {allocated_and_spent}, 'unallocated_income': {unallocated_income}}}")
         
-        # logger.info("Successfully fetched allocated amounts for user_id: %s", request.user_id)
-        return {"allocated": allocated, "unallocated_income": unallocated_income}
+        # logger.info("Successfully fetched allocated amounts and spent amounts for user_id: %s", request.user_id)
+        return {"allocated_and_spent": allocated_and_spent, "unallocated_income": unallocated_income}
     
     except Exception as e:
-        # print(f"DEBUG - Exception in get-allocated: {str(e)}")
+        # print(f"DEBUG - Exception in get-allocated-and-spent: {str(e)}")
         # print(f"DEBUG - Exception type: {type(e)}")
-        # logger.error("Failed to get categories with allocated amounts for user_id: %s, error: %s", request.user_id, e)
-        raise HTTPException(status_code=500, detail=f"Failed to get categories with allocated amounts: {str(e)}")
+        # logger.error("Failed to get categories with allocated and spent amounts for user_id: %s, error: %s", request.user_id, e)
+        raise HTTPException(status_code=500, detail=f"Failed to get categories with allocated and spent amounts: {str(e)}")
 
 @router.post("/create-category")
 async def create_category(category: Category):

@@ -1,35 +1,10 @@
 // filepath: c:\Users\james\dev\budgeting-app-3\frontend\services\categories.ts
 
-// export const getCategoriesWithAllocated = async (userId: string, startDate: string, endDate: string) => {
-//     // Dates are already in YYYY-MM-DD format, no need to format them
-//     const formattedStartDate = startDate;
-//     const formattedEndDate = endDate;
-    
-//     const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_CATEGORY_PREFIX}/get-categories-with-allocated`, {
-//       method: 'POST',
-//       headers: {
-//         'Content-Type': 'application/json',
-//       },
-//       body: JSON.stringify({
-//         user_id: userId,
-//         start_date: formattedStartDate,
-//         end_date: formattedEndDate,
-//       }),
-//     });
-  
-//     if (!response.ok) {
-//       throw new Error('Failed to fetch categories');
-//     }
-  
-//     const data = await response.json();
-//     return data;
-// };
-
-export const getAllocated = async (userId: string, startDate: string, endDate: string) => {
+export const getAllocatedAndSpent = async (userId: string, startDate: string, endDate: string) => {
     // Dates are already in YYYY-MM-DD format, no need to format them
     const formattedStartDate = startDate;
     const formattedEndDate = endDate;
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_CATEGORY_PREFIX}/get-allocated`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_CATEGORY_PREFIX}/get-allocated-and-spent`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -42,7 +17,7 @@ export const getAllocated = async (userId: string, startDate: string, endDate: s
     });
   
     if (!response.ok) {
-      throw new Error('Failed to fetch categories');
+      throw new Error('Failed to fetch allocated and spent amounts');
     }
   
     const data = await response.json();
