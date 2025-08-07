@@ -1,12 +1,13 @@
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, ClassVar
+from decimal import Decimal
 from .base import FirestoreModel
 
 class Transaction(FirestoreModel):
     """Model for transaction documents in Firestore"""
     
-    amount: float
+    amount: Decimal
     user_id: str
     name: str
     date: str    
@@ -25,6 +26,11 @@ class Transaction(FirestoreModel):
     @classmethod
     def validate_amount(cls, v):
         # Amount can be negative (expense) or positive (income)
+        # Convert to Decimal if it's not already
+        if isinstance(v, (int, float)):
+            return Decimal(str(v))
+        elif isinstance(v, str):
+            return Decimal(v)
         return v
     
     @field_validator('user_id')
@@ -51,6 +57,8 @@ class Transaction(FirestoreModel):
     def to_dict(self) -> Dict[str, Any]:
         """Convert model to a dictionary for Firestore"""
         data = self.model_dump(exclude_none=True)
+        # Convert Decimal to float for Firestore storage
+        data["amount"] = float(self.amount)
         # Ensure the type is set based on amount for consistency
         data["type"] = "debit" if self.amount < 0 else "credit"
         return data

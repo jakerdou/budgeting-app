@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 from .db import db
 from backend.db.schemas import Category as CategorySchema
 
@@ -46,7 +47,7 @@ class UpdateCategoryNameRequest(BaseModel):
 class UpdateCategoryGoalRequest(BaseModel):
     category_id: str
     user_id: str
-    goal_amount: float
+    goal_amount: Decimal
 
 # Category Methods
 @router.post("/get-categories")
@@ -117,18 +118,18 @@ async def get_allocated_and_spent(request: CategoriesWithAllocatedRequest):
                 
                 # Count assignments for debugging
                 assignment_count = 0
-                assignment_total = 0.0
+                assignment_total = Decimal('0.0')
                 
                 for assignment in assignments_docs:
                     assignment_count += 1
                     assignment_data = assignment.to_dict()
                     # print(f"DEBUG - Assignment found: {assignment_data}")
-                    amount = assignment_data.get("amount", 0.0)
+                    amount = Decimal(str(assignment_data.get("amount", 0.0)))
                     assignment_total += amount
                     # print(f"DEBUG - Running total: {assignment_total}")
                 
                 # print(f"DEBUG - Found {assignment_count} assignments for category {doc.id}")
-                allocated_amount = assignment_total
+                allocated_amount = float(assignment_total)
                 
             except Exception as stream_error:
                 # print(f"DEBUG - Error streaming assignments: {str(stream_error)}")
@@ -138,7 +139,7 @@ async def get_allocated_and_spent(request: CategoriesWithAllocatedRequest):
             category_result["allocated"] = allocated_amount
 
             # Calculate spent amount for the category (transactions in the time period)
-            spent_amount = 0.0
+            spent_amount = Decimal('0.0')
             try:
                 # Skip spending calculation for unallocated funds category
                 if not category_data.get("is_unallocated_funds", False):
@@ -147,7 +148,7 @@ async def get_allocated_and_spent(request: CategoriesWithAllocatedRequest):
                     
                     for transaction in transactions_docs:
                         transaction_data = transaction.to_dict()
-                        amount = transaction_data.get("amount", 0.0)
+                        amount = Decimal(str(transaction_data.get("amount", 0.0)))
                         # If amount is negative, it's spending (add to total)
                         # If amount is positive, it's a refund/return (subtract from total)
                         if amount < 0:
@@ -159,15 +160,15 @@ async def get_allocated_and_spent(request: CategoriesWithAllocatedRequest):
                     
             except Exception as spent_error:
                 # print(f"DEBUG - Error calculating spent amount: {str(spent_error)}")
-                spent_amount = 0.0
+                spent_amount = Decimal('0.0')
             
-            category_result["spent"] = spent_amount
+            category_result["spent"] = float(spent_amount)
             allocated_and_spent.append(category_result)
 
         # print(f"DEBUG - Processed {category_count} categories, returning {len(allocated_and_spent)} allocation records")
         
         # Calculate unallocated funds (sum of transactions in unallocated funds category)
-        unallocated_income = 0.0
+        unallocated_income = Decimal('0.0')
         try:
             # Find the unallocated funds category for this user
             unallocated_query = db.collection("categories").where("user_id", "==", request.user_id).where("is_unallocated_funds", "==", True).limit(1)
@@ -187,19 +188,19 @@ async def get_allocated_and_spent(request: CategoriesWithAllocatedRequest):
                 # Sum up the transaction amounts (income should be positive)
                 for transaction in unallocated_transactions_docs:
                     transaction_data = transaction.to_dict()
-                    amount = transaction_data.get("amount", 0.0)
+                    amount = Decimal(str(transaction_data.get("amount", 0.0)))
                     unallocated_income += amount
                     
         except Exception as unallocated_error:
             # Don't fail the entire request if unallocated funds calculation fails
             print(f"DEBUG - Error calculating unallocated funds: {str(unallocated_error)}")
-            unallocated_income = 0.0
+            unallocated_income = Decimal('0.0')
         
         # Debug the final result structure before returning
         # print(f"DEBUG - Final response structure: {{'allocated_and_spent': {allocated_and_spent}, 'unallocated_income': {unallocated_income}}}")
         
         # logger.info("Successfully fetched allocated amounts and spent amounts for user_id: %s", request.user_id)
-        return {"allocated_and_spent": allocated_and_spent, "unallocated_income": unallocated_income}
+        return {"allocated_and_spent": allocated_and_spent, "unallocated_income": float(unallocated_income)}
     
     except Exception as e:
         # print(f"DEBUG - Exception in get-allocated-and-spent: {str(e)}")
@@ -279,7 +280,7 @@ async def update_category_goal(request: UpdateCategoryGoalRequest):
             raise HTTPException(status_code=400, detail="Goal amount cannot be negative")
         
         # Update the category goal amount
-        goal_amount = None if request.goal_amount == 0 else request.goal_amount
+        goal_amount = None if request.goal_amount == 0 else float(request.goal_amount)
         category_ref.update({"goal_amount": goal_amount})
         
         return {"message": "Category goal updated successfully"}

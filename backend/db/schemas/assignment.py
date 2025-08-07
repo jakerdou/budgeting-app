@@ -1,12 +1,13 @@
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime, timezone
 from typing import Dict, Any
+from decimal import Decimal
 from .base import FirestoreModel
 
 class Assignment(FirestoreModel):
     """Model for assignment documents in Firestore"""
     
-    amount: float
+    amount: Decimal
     user_id: str
     category_id: str
     date: str
@@ -19,6 +20,12 @@ class Assignment(FirestoreModel):
     @field_validator('amount')
     @classmethod
     def validate_amount(cls, v):
+        # Convert to Decimal if it's not already
+        if isinstance(v, (int, float)):
+            v = Decimal(str(v))
+        elif isinstance(v, str):
+            v = Decimal(v)
+        
         if v == 0:
             raise ValueError("Assignment amount cannot be zero")
         return v
@@ -36,3 +43,10 @@ class Assignment(FirestoreModel):
         if not v or len(v.strip()) == 0:
             raise ValueError("Category ID cannot be empty")
         return v
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert model to a dictionary for Firestore"""
+        data = self.model_dump(exclude_none=True)
+        # Convert Decimal to float for Firestore storage
+        data["amount"] = float(self.amount)
+        return data

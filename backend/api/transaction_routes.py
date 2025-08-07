@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
+from decimal import Decimal
 from google.cloud import firestore
 from .db import db, NULL_VALUE
 from .plaid_utils import get_plaid_transactions, get_saved_cursor  # Assuming helper functions exist for Plaid API calls
@@ -40,7 +41,7 @@ class Category(BaseModel):
     user_id: str
 
 class Transaction(BaseModel):
-    amount: float
+    amount: Decimal
     user_id: str
     category_id: str
     name: str
@@ -168,11 +169,16 @@ async def create_transaction(transaction: Transaction):
         
         if category_doc.exists:
             category_data = category_doc.to_dict()
-            new_available = category_data.get("available", 0.0) + transaction.amount
-            category_ref.update({"available": new_available})
+            current_available = Decimal(str(category_data.get("available", 0.0)))
+            new_available = current_available + transaction.amount
+            category_ref.update({"available": float(new_available)})
+            
+            # Get user email for logging
+            user_data = user_doc.to_dict()
+            user_email = user_data.get('email', 'Unknown')
             
             # Log transaction creation with category
-            transaction_logger.info(f"Transaction created with category - Transaction: '{transaction.name}' (ID: {transaction_ref.id}), Amount: ${transaction.amount}, Category: '{category_data.get('name', 'Unknown')}' (ID: {transaction.category_id}), New category available: ${new_available}")
+            transaction_logger.info(f"Transaction created with category - Transaction: '{transaction.name}' (ID: {transaction_ref.id}), Amount: ${transaction.amount}, Category: '{category_data.get('name', 'Unknown')}' (ID: {transaction.category_id}), New category available: ${new_available}, User ID: {transaction.user_id}, User Email: {user_email}")
         
         # logger.info("Transaction created successfully with ID: %s", transaction_ref.id)
         return {"message": "Transaction created successfully.", "transaction_id": transaction_ref.id}
@@ -210,8 +216,10 @@ async def delete_transaction(request: DeleteTransactionRequest):
             
             # Update the available amount in the category
             category_data = category_doc.to_dict()
-            new_available = category_data.get("available", 0.0) - transaction_data["amount"]
-            category_ref.update({"available": new_available})
+            transaction_amount = Decimal(str(transaction_data["amount"]))
+            current_available = Decimal(str(category_data.get("available", 0.0)))
+            new_available = current_available - transaction_amount
+            category_ref.update({"available": float(new_available)})
             # print(f"Updated category {category_id} available amount to {new_available}")
         else:
             print("Transaction has no category - skipping category update")
@@ -294,10 +302,19 @@ async def update_transaction_category(request: UpdateTransactionCategoryRequest)
         transaction_amount = transaction_data["amount"]
         print(f"Transaction amount: {transaction_amount}")
         
+        # Get user email for logging
+        user_ref = db.collection("users").document(request.user_id)
+        user_doc = user_ref.get()
+        user_email = "Unknown"
+        if user_doc.exists:
+            user_data = user_doc.to_dict()
+            user_email = user_data.get('email', 'Unknown')
+        
         if old_category_data:
             print(f"Old category available before update: {old_category_data.get('available', 0.0)}")
-            new_old_available = old_category_data.get("available", 0.0) - transaction_amount
-            old_category_ref.update({"available": new_old_available})
+            old_available = Decimal(str(old_category_data.get("available", 0.0)))
+            new_old_available = old_available - Decimal(str(transaction_amount))
+            old_category_ref.update({"available": float(new_old_available)})
             print(f"Updated old category available amount to {new_old_available}")
         else:
             print("No old category to update (transaction was uncategorized).")
@@ -305,17 +322,18 @@ async def update_transaction_category(request: UpdateTransactionCategoryRequest)
         # Only update the new category if it's not null
         if new_category_data:
             print(f"New category available before update: {new_category_data.get('available', 0.0)}")
-            new_new_available = new_category_data.get("available", 0.0) + transaction_amount
-            new_category_ref.update({"available": new_new_available})
+            new_available = Decimal(str(new_category_data.get("available", 0.0)))
+            new_new_available = new_available + Decimal(str(transaction_amount))
+            new_category_ref.update({"available": float(new_new_available)})
             print(f"Updated new category available amount to {new_new_available}")
             
             # Log transaction categorization
-            transaction_logger.info(f"Transaction categorized - Transaction: '{transaction_data.get('name', 'Unknown')}' (ID: {request.transaction_id}), Amount: ${transaction_amount}, New category: '{new_category_data.get('name', 'Unknown')}' (ID: {request.category_id}), New category available: ${new_new_available}")
+            transaction_logger.info(f"Transaction categorized - Transaction: '{transaction_data.get('name', 'Unknown')}' (ID: {request.transaction_id}), Amount: ${transaction_amount}, New category: '{new_category_data.get('name', 'Unknown')}' (ID: {request.category_id}), New category available: ${new_new_available}, User ID: {request.user_id}, User Email: {user_email}")
         else:
             print("Transaction set to have no category - no new category to update")
             
             # Log transaction uncategorization
-            transaction_logger.info(f"Transaction uncategorized - Transaction: '{transaction_data.get('name', 'Unknown')}' (ID: {request.transaction_id}), Amount: ${transaction_amount}, Set to no category")
+            transaction_logger.info(f"Transaction uncategorized - Transaction: '{transaction_data.get('name', 'Unknown')}' (ID: {request.transaction_id}), Amount: ${transaction_amount}, Set to no category, User ID: {request.user_id}, User Email: {user_email}")
         
         print(f"Transaction category updated successfully for transaction_id: {request.transaction_id}")
         return {"message": "Transaction category updated successfully.", "transaction_id": request.transaction_id}
