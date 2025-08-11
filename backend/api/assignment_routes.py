@@ -53,10 +53,7 @@ async def create_assignment(assignment: Assignment):
             date=assignment.date
         )
         
-        # Convert to dict and save to Firestore
-        assignment_ref = db.collection("assignments").document()
-        assignment_ref.set(assignment_schema.to_dict())
-
+        # Find unallocated funds category before starting batch
         unallocated_query = db.collection("categories").where("user_id", "==", assignment.user_id).where("is_unallocated_funds", "==", True).limit(1)
         unallocated_docs = unallocated_query.stream()
         unallocated_category = None
@@ -67,15 +64,31 @@ async def create_assignment(assignment: Assignment):
         if not unallocated_category:
             raise HTTPException(status_code=404, detail="Unallocated funds category not found")
 
+        # Get current data for calculations
         unallocated_data = unallocated_category.to_dict()
+        category_data = category_doc.to_dict()
+        
         current_available = Decimal(str(unallocated_data.get("available", 0.0)))
         new_available = current_available - assignment.amount
-        unallocated_category.reference.update({"available": float(new_available)})
-
-        category_data = category_doc.to_dict()
+        
         current_category_available = Decimal(str(category_data.get("available", 0.0)))
         new_category_available = current_category_available + assignment.amount
-        category_ref.update({"available": float(new_category_available)})
+
+        # Use batch write for atomicity
+        batch = db.batch()
+        
+        # 1. Create assignment document
+        assignment_ref = db.collection("assignments").document()
+        batch.set(assignment_ref, assignment_schema.to_dict())
+        
+        # 2. Update unallocated funds (subtract assignment amount)
+        batch.update(unallocated_category.reference, {"available": float(new_available)})
+        
+        # 3. Update target category (add assignment amount)
+        batch.update(category_ref, {"available": float(new_category_available)})
+        
+        # Execute all writes atomically
+        batch.commit()
 
         # Get user email for logging
         user_data = user_doc.to_dict()

@@ -28,20 +28,27 @@ async def create_user(user: User):
         # Convert to dict for Firestore (validation happens automatically)
         user_data = user_schema.to_dict()
         
-        # Save to Firestore with the provided user_id
-        user_ref = db.collection(UserSchema.collection_name()).document(user.user_id)
-        user_ref.set(user_data)
-
         # Create "Unallocated Funds" category for the new user using schema
         unallocated_category = CategorySchema(
             name="Unallocated Funds",
-            user_id=user_ref.id,
+            user_id=user.user_id,  # Use the provided user_id instead of user_ref.id
             available=0.0,
             is_unallocated_funds=True
         )
         
+        # Use batch write for atomicity
+        batch = db.batch()
+        
+        # 1. Create the user
+        user_ref = db.collection(UserSchema.collection_name()).document(user.user_id)
+        batch.set(user_ref, user_data)
+        
+        # 2. Create the unallocated funds category
         unallocated_category_ref = db.collection(CategorySchema.collection_name()).document()
-        unallocated_category_ref.set(unallocated_category.to_dict())
+        batch.set(unallocated_category_ref, unallocated_category.to_dict())
+        
+        # Execute all writes atomically
+        batch.commit()
 
         return {"message": "User created successfully.", "user_id": user_ref.id}
     except ValueError as ve:

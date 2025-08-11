@@ -320,12 +320,18 @@ async def delete_category(request: DeleteCategoryRequest):
         assignments_query = db.collection("assignments").where("category_id", "==", request.category_id)
         assignments = list(assignments_query.stream())
         
+        # Use batch write for atomicity
+        batch = db.batch()
+        
         # Delete each assignment
         for assignment_doc in assignments:
-            assignment_doc.reference.delete()
+            batch.delete(assignment_doc.reference)
         
         # Delete the category
-        category_ref.delete()
+        batch.delete(category_ref)
+        
+        # Execute all deletions atomically
+        batch.commit()
         return {"message": "Category deleted successfully"}
     
     except HTTPException as e:

@@ -163,22 +163,30 @@ async def create_transaction(transaction: Transaction):
             type="debit" if transaction.amount < 0 else "credit"
         )
         
-        # Convert to dict and save to Firestore
-        transaction_ref = db.collection("transactions").document()
-        transaction_ref.set(transaction_schema.to_dict())
+        # Calculate new available amount for the category
+        category_data = category_doc.to_dict()
+        current_available = Decimal(str(category_data.get("available", 0.0)))
+        new_available = current_available + transaction.amount
         
-        if category_doc.exists:
-            category_data = category_doc.to_dict()
-            current_available = Decimal(str(category_data.get("available", 0.0)))
-            new_available = current_available + transaction.amount
-            category_ref.update({"available": float(new_available)})
-            
-            # Get user email for logging
-            user_data = user_doc.to_dict()
-            user_email = user_data.get('email', 'Unknown')
-            
-            # Log transaction creation with category
-            transaction_logger.info(f"Transaction created with category - Transaction: '{transaction.name}' (ID: {transaction_ref.id}), Amount: ${transaction.amount}, Category: '{category_data.get('name', 'Unknown')}' (ID: {transaction.category_id}), New category available: ${new_available}, User ID: {transaction.user_id}, User Email: {user_email}")
+        # Use batch write for atomicity
+        batch = db.batch()
+        
+        # 1. Create the transaction
+        transaction_ref = db.collection("transactions").document()
+        batch.set(transaction_ref, transaction_schema.to_dict())
+        
+        # 2. Update category available amount
+        batch.update(category_ref, {"available": float(new_available)})
+        
+        # Execute all writes atomically
+        batch.commit()
+        
+        # Get user email for logging
+        user_data = user_doc.to_dict()
+        user_email = user_data.get('email', 'Unknown')
+        
+        # Log transaction creation with category
+        transaction_logger.info(f"Transaction created with category - Transaction: '{transaction.name}' (ID: {transaction_ref.id}), Amount: ${transaction.amount}, Category: '{category_data.get('name', 'Unknown')}' (ID: {transaction.category_id}), New category available: ${new_available}, User ID: {transaction.user_id}, User Email: {user_email}")
         
         # logger.info("Transaction created successfully with ID: %s", transaction_ref.id)
         return {"message": "Transaction created successfully.", "transaction_id": transaction_ref.id}
@@ -207,6 +215,8 @@ async def delete_transaction(request: DeleteTransactionRequest):
             raise HTTPException(status_code=403, detail="User ID does not match the transaction")
         
         category_id = transaction_data.get("category_id")
+        new_available = None
+        
         if category_id:
             category_ref = db.collection("categories").document(category_id)
             category_doc = category_ref.get()
@@ -214,18 +224,26 @@ async def delete_transaction(request: DeleteTransactionRequest):
             if not category_doc.exists:
                 raise HTTPException(status_code=404, detail="Category not found")
             
-            # Update the available amount in the category
+            # Calculate new available amount for the category
             category_data = category_doc.to_dict()
             transaction_amount = Decimal(str(transaction_data["amount"]))
             current_available = Decimal(str(category_data.get("available", 0.0)))
             new_available = current_available - transaction_amount
-            category_ref.update({"available": float(new_available)})
-            # print(f"Updated category {category_id} available amount to {new_available}")
         else:
             print("Transaction has no category - skipping category update")
+
+        # Use batch write for atomicity
+        batch = db.batch()
         
-        # Delete the transaction
-        transaction_ref.delete()
+        # 1. Delete the transaction
+        batch.delete(transaction_ref)
+        
+        # 2. Update category available amount if transaction had a category
+        if category_id and new_available is not None:
+            batch.update(category_ref, {"available": float(new_available)})
+        
+        # Execute all writes atomically
+        batch.commit()
         # print(f"Transaction {request.transaction_id} deleted successfully")
         
         return {"message": "Transaction deleted successfully.", "transaction_id": request.transaction_id}
@@ -290,15 +308,8 @@ async def update_transaction_category(request: UpdateTransactionCategoryRequest)
             if new_category_data["user_id"] != request.user_id:
                 print(f"New category user ID mismatch: {new_category_data['user_id']} != {request.user_id}")
                 raise HTTPException(status_code=403, detail="New category does not belong to the user")
-          # Update the transaction's category_id
-        if request.category_id == "null" or request.category_id is None:
-            print(f"Setting transaction {request.transaction_id} to have no category (null)")
-            transaction_ref.update({"category_id": None})
-        else:
-            print(f"Updating transaction {request.transaction_id} to new category {request.category_id}")
-            transaction_ref.update({"category_id": request.category_id})
-
-        # Adjust the available amounts in the old and new categories
+        
+        # Get transaction amount for calculations
         transaction_amount = transaction_data["amount"]
         print(f"Transaction amount: {transaction_amount}")
         
@@ -309,22 +320,40 @@ async def update_transaction_category(request: UpdateTransactionCategoryRequest)
         if user_doc.exists:
             user_data = user_doc.to_dict()
             user_email = user_data.get('email', 'Unknown')
+
+        # Calculate new available amounts before batch operations
+        new_old_available = None
+        new_new_available = None
         
         if old_category_data:
-            print(f"Old category available before update: {old_category_data.get('available', 0.0)}")
             old_available = Decimal(str(old_category_data.get("available", 0.0)))
             new_old_available = old_available - Decimal(str(transaction_amount))
-            old_category_ref.update({"available": float(new_old_available)})
-            print(f"Updated old category available amount to {new_old_available}")
-        else:
-            print("No old category to update (transaction was uncategorized).")
-        
-        # Only update the new category if it's not null
+            
         if new_category_data:
-            print(f"New category available before update: {new_category_data.get('available', 0.0)}")
             new_available = Decimal(str(new_category_data.get("available", 0.0)))
             new_new_available = new_available + Decimal(str(transaction_amount))
-            new_category_ref.update({"available": float(new_new_available)})
+
+        # Use batch write for atomicity
+        batch = db.batch()
+        
+        # 1. Update the transaction's category_id
+        if request.category_id == "null" or request.category_id is None:
+            batch.update(transaction_ref, {"category_id": None})
+        else:
+            batch.update(transaction_ref, {"category_id": request.category_id})
+        
+        # 2. Update old category available amount (subtract transaction amount)
+        if old_category_data and old_category_ref:
+            batch.update(old_category_ref, {"available": float(new_old_available)})
+        
+        # 3. Update new category available amount (add transaction amount)
+        if new_category_data and new_category_ref:
+            batch.update(new_category_ref, {"available": float(new_new_available)})
+        
+        # Execute all writes atomically
+        batch.commit()
+        # Log the transaction categorization results
+        if new_category_data and new_new_available is not None:
             print(f"Updated new category available amount to {new_new_available}")
             
             # Log transaction categorization
@@ -334,6 +363,11 @@ async def update_transaction_category(request: UpdateTransactionCategoryRequest)
             
             # Log transaction uncategorization
             transaction_logger.info(f"Transaction uncategorized - Transaction: '{transaction_data.get('name', 'Unknown')}' (ID: {request.transaction_id}), Amount: ${transaction_amount}, Set to no category, User ID: {request.user_id}, User Email: {user_email}")
+        
+        if old_category_data and new_old_available is not None:
+            print(f"Updated old category available amount to {new_old_available}")
+        else:
+            print("No old category to update (transaction was uncategorized).")
         
         print(f"Transaction category updated successfully for transaction_id: {request.transaction_id}")
         return {"message": "Transaction category updated successfully.", "transaction_id": request.transaction_id}
@@ -400,59 +434,65 @@ async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):
             
             # Store the last cursor for this item to update later
             if last_cursor:
-                cursor_updates[item_id] = last_cursor        # Process added transactions
+                cursor_updates[item_id] = last_cursor        # Process added transactions with batch operations
         print(f"Processing {len(added_transactions)} added transactions")
         print("Debug: Making sure category_id is explicitly set to None")
-        for transaction in added_transactions:
-            # Get the correct item_data for this transaction
-            item_data = transaction_item_map.get(transaction["transaction_id"])
-            if not item_data:
-                print(f"Warning: No item data found for transaction {transaction['transaction_id']}")
+        
+        # Process in batches of 500 (Firestore batch limit)
+        batch_size = 500
+        total_batches = (len(added_transactions) + batch_size - 1) // batch_size
+        successful_batches = 0
+        
+        for i in range(0, len(added_transactions), batch_size):
+            batch_num = (i // batch_size) + 1
+            print(f"Processing batch {batch_num}/{total_batches}")
+            
+            batch = db.batch()
+            batch_transactions = added_transactions[i:i + batch_size]
+            
+            try:
+                for transaction in batch_transactions:
+                    # Get the correct item_data for this transaction
+                    item_data = transaction_item_map.get(transaction["transaction_id"])
+                    if not item_data:
+                        print(f"Warning: No item data found for transaction {transaction['transaction_id']}")
+                        continue
+
+                    print(f"Adding transaction: {transaction['transaction_id']}")
+
+                    account_name = next(
+                        (account["name"] for account in item_data.get("accounts", []) if account["account_id"] == transaction["account_id"]),
+                        None
+                    )              
+                    
+                    # Create explicit transaction data dictionary
+                    transaction_dict = {
+                        "amount": -transaction["amount"],
+                        "name": transaction["name"],
+                        "date": transaction['date'].strftime("%Y-%m-%d"),
+                        "user_id": user_id,
+                        "plaid_transaction_id": transaction["transaction_id"],
+                        "institution_name": item_data["institution_name"],
+                        "account_name": account_name,
+                        "category_id": NULL_VALUE,  # Use the explicit NULL_VALUE constant
+                        "created_at": datetime.now(timezone.utc),
+                        "type": "debit" if -transaction["amount"] < 0 else "credit"
+                    }
+                    
+                    transaction_ref = db.collection("transactions").document()
+                    batch.set(transaction_ref, transaction_dict)
+                
+                # Commit this batch of transactions
+                batch.commit()
+                successful_batches += 1
+                print(f"✅ Successfully created batch {batch_num}/{total_batches} with {len(batch_transactions)} transactions")
+                
+            except Exception as batch_error:
+                print(f"❌ Failed to process batch {batch_num}/{total_batches}: {batch_error}")
+                # Continue with next batch rather than failing entirely
                 continue
-
-            print(f"Adding transaction: {transaction['transaction_id']}")
-
-            account_name = next(
-                (account["name"] for account in item_data.get("accounts", []) if account["account_id"] == transaction["account_id"]),
-                None
-            )              
-            # Create a validated transaction using our schema
-            transaction_schema = TransactionSchema(
-                amount=-transaction["amount"],
-                name=transaction["name"],
-                date=transaction['date'].strftime("%Y-%m-%d"),
-                user_id=user_id,
-                plaid_transaction_id=transaction["transaction_id"],
-                institution_name=item_data["institution_name"],
-                account_name=account_name,
-                category_id=None  # Explicitly set category_id to None for new transactions
-            )
-            
-            # Create explicit transaction data dictionary
-            transaction_dict = {
-                "amount": -transaction["amount"],
-                "name": transaction["name"],
-                "date": transaction['date'].strftime("%Y-%m-%d"),
-                "user_id": user_id,
-                "plaid_transaction_id": transaction["transaction_id"],
-                "institution_name": item_data["institution_name"],
-                "account_name": account_name,
-                "category_id": NULL_VALUE,  # Use the explicit NULL_VALUE constant
-                "created_at": datetime.now(timezone.utc),
-                "type": "debit" if -transaction["amount"] < 0 else "credit"
-            }
-            
-            print(f"Debug direct dictionary with NULL_VALUE: {transaction_dict}")
-            
-            transaction_ref = db.collection("transactions").document()
-            # Use merge=False to ensure fields are set exactly as provided
-            transaction_ref.set(transaction_dict, merge=False)
-            
-            # Verify the document was created with the category_id field
-            created_doc = transaction_ref.get()
-            created_data = created_doc.to_dict()
-            print(f"Debug created document data: {created_data}")
-            print(f"Debug created document has category_id: {'category_id' in created_data}")
+        
+        print(f"Completed transaction creation: {successful_batches}/{total_batches} batches successful")
 
         # Process modified transactions
         print(f"Processing {len(modified_transactions)} modified transactions")
@@ -525,10 +565,15 @@ async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):
                 print(f"Deleting transaction with ID: {doc.id}")
                 doc.reference.delete()
 
-        # Now that all transactions have been processed successfully, update the cursors
-        for item_id, cursor in cursor_updates.items():
-            print(f"Updating cursor for item {item_id} to {cursor}")
-            db.collection("plaid_items").document(item_id).update({"cursor": cursor})
+        # Now that all transactions have been processed successfully, update the cursors with batch write
+        if cursor_updates:
+            batch = db.batch()
+            for item_id, cursor in cursor_updates.items():
+                print(f"Updating cursor for item {item_id} to {cursor}")
+                item_ref = db.collection("plaid_items").document(item_id)
+                batch.update(item_ref, {"cursor": cursor})
+            batch.commit()
+            print(f"Updated {len(cursor_updates)} cursors atomically")
 
         print("Sync completed successfully")
         return {"message": "Transactions synced successfully."}
