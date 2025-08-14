@@ -7,7 +7,7 @@ import AddTransactionModal from '@/components/transactions/AddTransactionModal';
 import TransactionInfoModal from '@/components/transactions/TransactionInfoModal';
 import TransactionsTabHeader from '@/components/transactions/TransactionsTabHeader';
 import BulkCategorySelectionBar from '@/components/transactions/BulkCategorySelectionBar';
-import { getTransactions, addTransaction, deleteTransaction, updateTransactionCategory, syncPlaidTransactions } from '@/services/transactions';
+import { getTransactions, addTransaction, deleteTransaction, updateTransactionCategory, syncPlaidTransactions, bulkDeleteTransactions } from '@/services/transactions';
 import { Transaction } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import DropdownButton from '@/components/DropdownButton';
@@ -416,6 +416,10 @@ export default function Tab() {
             setSelectedTransactions([]); // Clear selection after bulk update
           }}
           onClearSelection={() => setSelectedTransactions([])}
+          onBulkDeleteComplete={() => {
+            fetchTransactions();
+            setSelectedTransactions([]); // Clear selection after bulk delete
+          }}
         />
       )}        
       {displayedTransactions.length === 0 ? (

@@ -26,7 +26,7 @@ backend/api-venv/
 backend/api/logs/
 backend/api/transactions_response.json
 backend/api/transaction_get_test.py
-backend/db_validation_results.json
+backend/db_validations/
 backend/budgeting-app-firebase-adminsdk.json
 
 firebaseConfig.js

@@ -563,7 +563,40 @@ async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):
 
             for doc in existing_docs:
                 print(f"Deleting transaction with ID: {doc.id}")
-                doc.reference.delete()
+                
+                # Get transaction data before deleting to check for category
+                transaction_data = doc.to_dict()
+                category_id = transaction_data.get("category_id")
+                new_available = None
+                
+                if category_id:
+                    category_ref = db.collection("categories").document(category_id)
+                    category_doc = category_ref.get()
+                    
+                    if category_doc.exists:
+                        # Calculate new available amount for the category
+                        category_data = category_doc.to_dict()
+                        transaction_amount = Decimal(str(transaction_data["amount"]))
+                        current_available = Decimal(str(category_data.get("available", 0.0)))
+                        new_available = current_available - transaction_amount
+                        print(f"Updating category {category_id} available amount from {current_available} to {new_available}")
+                    else:
+                        print(f"Warning: Category {category_id} not found for transaction {doc.id}")
+                else:
+                    print(f"Transaction {doc.id} has no category - skipping category update")
+
+                # Use batch write for atomicity
+                batch = db.batch()
+                
+                # 1. Delete the transaction
+                batch.delete(doc.reference)
+                
+                # 2. Update category available amount if transaction had a category
+                if category_id and new_available is not None and category_doc.exists:
+                    batch.update(category_ref, {"available": float(new_available)})
+                
+                # Execute all writes atomically
+                batch.commit()
 
         # Now that all transactions have been processed successfully, update the cursors with batch write
         if cursor_updates:

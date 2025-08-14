@@ -36,6 +36,7 @@ export default function Tab() {
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [fixingCategories, setFixingCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (budgetPeriod === 'monthly') {
@@ -133,6 +134,12 @@ export default function Tab() {
   const handleFixNegativeAvailable = async (category: Category) => {
     if (category.available >= 0) return;
     
+    // Check if this category is already being fixed
+    if (fixingCategories.has(category.id)) return;
+    
+    // Add category to fixing set
+    setFixingCategories(prev => new Set(prev).add(category.id));
+    
     const amountToAllocate = Math.abs(category.available);
     const assignment = {
       amount: amountToAllocate,
@@ -146,6 +153,13 @@ export default function Tab() {
       fetchAllocatedAndSpent();
     } catch (error) {
       console.error('Error fixing negative available:', error);
+    } finally {
+      // Remove category from fixing set after operation completes
+      setFixingCategories(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(category.id);
+        return newSet;
+      });
     }
   };
 
@@ -177,6 +191,7 @@ export default function Tab() {
     const spentAmount = getSpentAmount(item.id);
     const hasNegativeAvailable = item.available < 0;
     const hasGoalShortfall = item.goal_amount && allocatedAmount < item.goal_amount;
+    const isBeingFixed = fixingCategories.has(item.id);
     
     return (
       <View style={styles.item}>
@@ -208,7 +223,7 @@ export default function Tab() {
             <View style={styles.mainValuesRow}>
               {/* Quick action buttons */}
               <View style={styles.actionButtons}>
-                {hasNegativeAvailable && (
+                {hasNegativeAvailable && !isBeingFixed && (
                   <TouchableOpacity
                     style={styles.fixButton}
                     onPress={() => handleFixNegativeAvailable(item)}
@@ -217,6 +232,13 @@ export default function Tab() {
                     <Ionicons name="add-circle" size={20} color="#FF6B6B" />
                     <Text style={styles.fixButtonText}>Fix</Text>
                   </TouchableOpacity>
+                )}
+                
+                {isBeingFixed && (
+                  <View style={styles.fixingButton}>
+                    <Ionicons name="checkmark-circle" size={20} color="#28A745" />
+                    <Text style={styles.fixingButtonText}>Fixing...</Text>
+                  </View>
                 )}
                 
                 {hasGoalShortfall && (
@@ -457,6 +479,22 @@ const styles = StyleSheet.create({
   },
   fixButtonText: {
     color: '#FF6B6B',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  fixingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#28A745',
+  },
+  fixingButtonText: {
+    color: '#28A745',
     fontSize: 12,
     fontWeight: '600',
     marginLeft: 4,

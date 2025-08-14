@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { getTransactionsForCategory } from '@/services/transactions';
 import { Transaction, Category } from '@/types';
 import { Checkbox } from 'react-native-paper';
@@ -20,28 +20,66 @@ const CategoryTransactionsTab: React.FC<CategoryTransactionsTabProps> = ({
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCurrentPeriodOnly, setShowCurrentPeriodOnly] = useState(true);
+  
+  // Pagination state
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+
+  const fetchTransactions = async (replace: boolean = true) => {
+    if (!userId) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Fetch transactions for this category
+      const response = await getTransactionsForCategory(
+        userId, 
+        category.id, 
+        20,  // Limit to 20 transactions per page
+        null  // No cursor for initial load
+      );
+      setTransactions(response.transactions || []);
+      setNextCursor(response.pagination?.next_cursor || null);
+      setHasMore(response.pagination?.has_more || false);
+    } catch (err) {
+      console.error('Failed to fetch transactions for category:', err);
+      setError('Failed to load transactions');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadMoreTransactions = async () => {
+    if (userId && hasMore && nextCursor && !isLoadingMore) {
+      try {
+        setIsLoadingMore(true);
+        const response = await getTransactionsForCategory(
+          userId,
+          category.id,
+          20,  // Limit to 20 transactions per page
+          nextCursor
+        );
+        
+        // Append the new transactions to existing ones
+        setTransactions(prev => [...prev, ...(response.transactions || [])]);
+        setNextCursor(response.pagination?.next_cursor || null);
+        setHasMore(response.pagination?.has_more || false);
+      } catch (error) {
+        console.error('Failed to load more transactions', error);
+      } finally {
+        setIsLoadingMore(false);
+      }
+    }
+  };
 
   useEffect(() => {
-    const fetchTransactions = async () => {
-      if (!userId) return;
-      
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // Fetch transactions for this category
-        const response = await getTransactionsForCategory(userId, category.id);
-        setTransactions(response.transactions || []);
-      } catch (err) {
-        console.error('Failed to fetch transactions for category:', err);
-        setError('Failed to load transactions');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
+    // Reset pagination and fetch transactions when user or category changes
+    setNextCursor(null);
+    setHasMore(true);
     fetchTransactions();
   }, [userId, category.id]);
 
@@ -113,6 +151,26 @@ const CategoryTransactionsTab: React.FC<CategoryTransactionsTabProps> = ({
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           style={styles.list}
+          onEndReached={loadMoreTransactions}
+          onEndReachedThreshold={0.1}
+          ListFooterComponent={
+            isLoadingMore ? (
+              <View style={styles.loadingMoreContainer}>
+                <Text style={styles.loadingText}>Loading more transactions...</Text>
+              </View>
+            ) : hasMore ? (
+              <TouchableOpacity 
+                style={styles.loadMoreButton} 
+                onPress={loadMoreTransactions}
+              >
+                <Text style={styles.loadMoreText}>Load More</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.endOfListText}>No more transactions</Text>
+            )
+          }
+          refreshing={isLoading}
+          onRefresh={() => fetchTransactions()}
         />
       )}
     </View>
@@ -193,6 +251,37 @@ const styles = StyleSheet.create({
   },
   negativeAmount: {
     color: '#666', // Default color for negative amounts
+  },
+  loadingMoreContainer: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    padding: 10,
+  },
+  loadMoreButton: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 12,
+    margin: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    fontSize: 16,
+    color: '#0066cc',
+    fontWeight: '500',
+  },
+  endOfListText: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    padding: 16,
+    fontStyle: 'italic',
   },
 });
 

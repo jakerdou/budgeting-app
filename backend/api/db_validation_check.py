@@ -257,17 +257,27 @@ def validate_database_integrity():
     else:
         print("\n✅ All category available amounts are correct!")
     
-    # Save detailed results to JSON file
+    # Save detailed results to JSON file with timestamp in db_validations folder
+    timestamp = datetime.datetime.now()
+    timestamp_str = timestamp.strftime("%Y%m%d_%H%M%S")
+    
+    # Create db_validations directory if it doesn't exist
+    validations_dir = 'db_validations'
+    os.makedirs(validations_dir, exist_ok=True)
+    
+    filename = f'db_validation_results_{timestamp_str}.json'
+    filepath = os.path.join(validations_dir, filename)
+    
     results = {
-        'validation_timestamp': datetime.datetime.now().isoformat(),
+        'validation_timestamp': timestamp.isoformat(),
         'summary': summary_stats,
         'issues': all_issues
     }
     
-    with open('db_validation_results.json', 'w') as json_file:
+    with open(filepath, 'w') as json_file:
         json.dump(results, json_file, indent=4, default=custom_serializer)
     
-    print(f"\nDetailed results saved to: db_validation_results.json")
+    print(f"\nDetailed results saved to: {filepath}")
     
     return len(all_issues) == 0
 

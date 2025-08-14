@@ -15,9 +15,8 @@ const BudgetPeriod: React.FC<BudgetPeriodProps> = ({ budgetPeriod, setBudgetPeri
 
 
   return (
-    <View>
-    {/* <View style={styles.container}> */}
-      <Text>Pay Period</Text>
+    <View style={styles.container}>
+      <Text style={styles.label}>Pay Period</Text>
       <Picker
         selectedValue={budgetPeriod}
         style={styles.picker}
@@ -35,26 +34,18 @@ const BudgetPeriod: React.FC<BudgetPeriodProps> = ({ budgetPeriod, setBudgetPeri
         <Picker.Item label="Every Other Week" value="Every Other Week" />
       </Picker>
       {budgetPeriod === 'Every Other Week' && showDatePicker && (
-        Platform.OS === 'web' ? (          
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            // style={styles.input}
-          />
-        ) : (
-          <></>          
-          // <DateTimePicker
-          //   value={new Date(startDate)}
-          //   mode="date"
-          //   display="default"
-          //   onChange={(event, selectedDate) => {
-          //     const currentDate = selectedDate || new Date(startDate);
-          //   //   setShowDatePicker(false);
-          //     setStartDate(formatDateToYYYYMMDD(currentDate));
-          //   }}
-          // />
-        )
+        <View style={styles.dateContainer}>
+          {Platform.OS === 'web' ? (          
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={styles.dateInput}
+            />
+          ) : (
+            <></>          
+          )}
+        </View>
       )}
     </View>
   );
@@ -62,11 +53,44 @@ const BudgetPeriod: React.FC<BudgetPeriodProps> = ({ budgetPeriod, setBudgetPeri
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 20,
+    marginVertical: 12,
+    alignItems: 'center',
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 8,
   },
   picker: {
-    // height: 50,
+    height: 40,
     width: 200,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  dateContainer: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: '#ffffff',
+    fontSize: 14,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
   },
   input: {
     borderWidth: 1,

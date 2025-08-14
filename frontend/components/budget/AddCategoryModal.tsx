@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Platform } from 'react-native';
 import Modal from 'react-native-modal'; // Importing react-native-modal
 import { addCategory } from '@/services/categories';
@@ -12,6 +12,22 @@ type AddCategoryModalProps = {
 
 const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onClose, userId, onNewCategory }) => {
   const [newCategoryName, setNewCategoryName] = useState('');
+  const nameInputRef = useRef<TextInput>(null);
+
+  // Focus the input when the modal becomes visible
+  useEffect(() => {
+    if (visible && nameInputRef.current) {
+      // Add a small delay to ensure the modal animation completes before focusing
+      const timer = setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    } else if (!visible) {
+      // Clear the input when modal is closed
+      setNewCategoryName('');
+    }
+  }, [visible]);
 
   const handleAddCategory = async () => {
     if (userId) {
@@ -23,8 +39,7 @@ const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onClose, u
         available: 0,
       };
       onNewCategory(newCategory); // Notify parent component
-      setNewCategoryName('');
-      onClose();
+      onClose(); // Input will be cleared by useEffect when modal closes
     }
   };
 
@@ -41,10 +56,12 @@ const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onClose, u
       <View style={styles.modalView}>
         <Text style={styles.modalText}>Add New Category</Text>
         <TextInput
+          ref={nameInputRef}
           style={styles.input}
           placeholder="Category Name"
           value={newCategoryName}
           onChangeText={setNewCategoryName}
+          autoFocus={Platform.OS === 'web'} // For web, use autoFocus
         />
         <Button title="Add" onPress={handleAddCategory} />
         <Button title="Cancel" onPress={onClose} />

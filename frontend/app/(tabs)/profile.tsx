@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Button, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, Button, FlatList, Alert, ActivityIndicator, Platform, TouchableOpacity, ScrollView } from 'react-native';
 import { useAuth } from '@/context/AuthProvider';
 import Preferences from '@/components/profile/Preferences';
 import { useEffect, useState } from 'react';
@@ -87,85 +87,149 @@ export default function Tab() {
   };
 
   return (
-    <View style={styles.container}>
-      {user && <Text>Logged in as: {user.email}</Text>}
-      <Button title="Logout" onPress={logout} />
-      <Preferences userId={user?.uid} preferences={user?.preferences} />
-
-      {showConfirmation && itemToDelete && (
-        <View style={styles.confirmationOverlay}>
-          <View style={styles.confirmationDialog}>
-            <Text style={styles.confirmationTitle}>Confirm Deletion</Text>
-            <Text style={styles.confirmationMessage}>
-              Are you sure you want to unlink {itemToDelete.name}?
-            </Text>
-            <View style={styles.confirmationButtons}>
-              <Button
-                title="Cancel"
-                onPress={() => {
-                  setShowConfirmation(false);
-                  setItemToDelete(null);
-                }}
-              />
-              <View style={styles.buttonSpacer} />
-              <Button
-                title="Delete"
-                color="red"
-                onPress={() => performDeleteItem(itemToDelete.id, itemToDelete.name)}
-              />
-            </View>
+    <ScrollView style={styles.scrollContainer}>
+      <View style={styles.container}>
+        
+        {/* Profile Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>Profile</Text>
+          <View style={styles.sectionContent}>
+            {user && (
+              <View style={styles.profileInfo}>
+                <Text style={styles.profileText}>Logged in as: {user.email}</Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+              <Text style={styles.logoutButtonText}>Logout</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      )}
 
-      <Text style={styles.sectionHeader}>Linked Accounts</Text>
-      {plaidItems.length === 0 ? (
-        <Text style={styles.noItems}>No linked accounts found</Text>
-      ) : (
-        <FlatList
-          data={plaidItems}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <Text style={styles.name}>{item.institution_name}</Text>
-              {isDeleting && deleteItemId === item.id ? (
-                <ActivityIndicator size="small" color="#0000ff" />
-              ) : (
-                <Button
-                  title="Unlink"
-                  color="red"
-                  onPress={() => handleDeleteItem(item.id, item.institution_name)}
-                  disabled={isDeleting}
-                />
-              )}
+        {/* Preferences Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>Preferences</Text>
+          <View style={styles.sectionContent}>
+            <Preferences userId={user?.uid} preferences={user?.preferences} />
+          </View>
+        </View>
+
+        {/* Linked Accounts Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>Linked Accounts</Text>
+          <View style={styles.sectionContent}>
+            {plaidItems.length === 0 ? (
+              <Text style={styles.noItems}>No linked accounts found</Text>
+            ) : (
+              <FlatList
+                data={plaidItems}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <View style={styles.item}>
+                    <Text style={styles.name}>{item.institution_name}</Text>
+                    {isDeleting && deleteItemId === item.id ? (
+                      <ActivityIndicator size="small" color="#0000ff" />
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.unlinkButton}
+                        onPress={() => handleDeleteItem(item.id, item.institution_name)}
+                        disabled={isDeleting}
+                      >
+                        <Text style={styles.unlinkButtonText}>Unlink</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              />
+            )}
+          </View>
+        </View>
+
+        {showConfirmation && itemToDelete && (
+          <View style={styles.confirmationOverlay}>
+            <View style={styles.confirmationDialog}>
+              <Text style={styles.confirmationTitle}>Confirm Deletion</Text>
+              <Text style={styles.confirmationMessage}>
+                Are you sure you want to unlink {itemToDelete.name}?
+              </Text>
+              <View style={styles.confirmationButtons}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => {
+                    setShowConfirmation(false);
+                    setItemToDelete(null);
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <View style={styles.buttonSpacer} />
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => performDeleteItem(itemToDelete.id, itemToDelete.name)}
+                >
+                  <Text style={styles.deleteButtonText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          )}
-        />
-      )}
-    </View>
+          </View>
+        )}
+      
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 16,
+  },
+  section: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sectionHeader: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginVertical: 8,
+    color: '#333',
+    padding: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  sectionContent: {
+    padding: 16,
+    paddingTop: 8,
+  },
+  profileInfo: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  profileText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
   },
   item: {
-    paddingVertical: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    borderBottomColor: '#e0e0e0',
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    gap: 20,
   },
   name: {
     fontSize: 16,
@@ -178,7 +242,9 @@ const styles = StyleSheet.create({
   noItems: {
     marginTop: 20,
     fontSize: 16,
-    color: '#666',
+    color: '#999',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   confirmationOverlay: {
     position: 'absolute',
@@ -212,5 +278,53 @@ const styles = StyleSheet.create({
   },
   buttonSpacer: {
     width: 10,
+  },
+  logoutButton: {
+    backgroundColor: '#007BFF',
+    padding: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+    minWidth: 120,
+  },
+  logoutButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  unlinkButton: {
+    backgroundColor: '#dc3545',
+    padding: 8,
+    borderRadius: 5,
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  unlinkButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  cancelButton: {
+    backgroundColor: '#6c757d',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  deleteButton: {
+    backgroundColor: '#dc3545',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

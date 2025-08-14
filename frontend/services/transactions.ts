@@ -59,16 +59,29 @@ export const addTransaction = async (userId: string, amount: number, categoryId:
     return data;
 };
 
-export const getTransactionsForCategory = async (userId: string, categoryId: string) => {
+export const getTransactionsForCategory = async (userId: string, categoryId: string, limit: number = 20, cursorId: string | null = null) => {
+    // Create the request body, ensuring we only include defined values
+    const requestBody: any = {
+      user_id: userId,
+      category_id: categoryId
+    };
+    
+    // Only add limit if it's not the default
+    if (limit !== 20) {
+      requestBody.limit = limit;
+    }
+    
+    // Only add cursor_id if it's provided
+    if (cursorId !== null) {
+      requestBody.cursor_id = cursorId;
+    }
+
     const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/get-transactions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        user_id: userId,
-        category_id: categoryId,
-      }),
+      body: JSON.stringify(requestBody),
     });
   
     if (!response.ok) {
@@ -135,5 +148,21 @@ export const syncPlaidTransactions = async (userId: string) => {
 
     const data = await response.json();
     return data;
+};
+
+export const bulkDeleteTransactions = async (userId: string, transactionIds: string[]) => {
+    // Since there's no bulk delete endpoint, we'll delete transactions one by one
+    const results = [];
+    
+    for (const transactionId of transactionIds) {
+        try {
+            await deleteTransaction(userId, transactionId);
+            results.push({ transactionId, success: true });
+        } catch (error) {
+            results.push({ transactionId, success: false, error });
+        }
+    }
+    
+    return results;
 };
 
