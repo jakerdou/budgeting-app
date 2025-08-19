@@ -133,6 +133,27 @@ export const updateTransactionCategory = async (userId: string, transactionId: s
     return data;
 };
 
+export const updateTransactionDate = async (userId: string, transactionId: string, date: string) => {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/update-transaction-date`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            transaction_id: transactionId,
+            date: date
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to update transaction date');
+    }
+
+    const data = await response.json();
+    return data;
+};
+
 export const syncPlaidTransactions = async (userId: string) => {
     const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_TRANSACTION_PREFIX}/sync-plaid-transactions`, {
         method: 'POST',

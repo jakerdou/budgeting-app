@@ -56,6 +56,11 @@ class UpdateTransactionCategoryRequest(BaseModel):
     transaction_id: str
     category_id: str
 
+class UpdateTransactionDateRequest(BaseModel):
+    user_id: str
+    transaction_id: str
+    date: str
+
 class SyncPlaidTransactionsRequest(BaseModel):
     user_id: str
 
@@ -374,6 +379,50 @@ async def update_transaction_category(request: UpdateTransactionCategoryRequest)
     except Exception as e:
         print(f"Error updating transaction category: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update transaction category: {e}")
+
+@router.post("/update-transaction-date")
+async def update_transaction_date(request: UpdateTransactionDateRequest):
+    try:
+        print(f"Received request to update transaction date: {request}")
+        
+        transaction_ref = db.collection("transactions").document(request.transaction_id)
+        transaction_doc = transaction_ref.get()
+        
+        if not transaction_doc.exists:
+            print(f"Transaction with ID {request.transaction_id} not found.")
+            raise HTTPException(status_code=404, detail="Transaction not found")
+        
+        transaction_data = transaction_doc.to_dict()
+        print(f"Transaction data: {transaction_data}")
+        
+        if transaction_data["user_id"] != request.user_id:
+            print(f"User ID mismatch: {transaction_data['user_id']} != {request.user_id}")
+            raise HTTPException(status_code=403, detail="User ID does not match the transaction")
+        
+        # Check if the date is already the same - no need to update
+        if transaction_data.get("date") == request.date:
+            print(f"Date is already the same ({request.date}), no update needed")
+            return {"message": "Transaction date is already set to the requested date.", "transaction_id": request.transaction_id}
+        
+        # Update the transaction date
+        transaction_ref.update({"date": request.date})
+        
+        # Get user email for logging
+        user_ref = db.collection("users").document(request.user_id)
+        user_doc = user_ref.get()
+        user_email = "Unknown"
+        if user_doc.exists:
+            user_data = user_doc.to_dict()
+            user_email = user_data.get("email", "Unknown")
+        
+        # Log the transaction date update
+        transaction_logger.info(f"Transaction date updated - User: {user_email}, Transaction ID: {request.transaction_id}, Old Date: {transaction_data.get('date')}, New Date: {request.date}")
+        
+        print(f"Transaction date updated successfully for transaction_id: {request.transaction_id}")
+        return {"message": "Transaction date updated successfully.", "transaction_id": request.transaction_id}
+    except Exception as e:
+        print(f"Error updating transaction date: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update transaction date: {e}")
 
 @router.post("/sync-plaid-transactions")
 async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):

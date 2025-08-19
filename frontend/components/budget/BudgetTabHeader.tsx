@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import DatePickers from '@/components/budget/DatePickers';
 import { Category } from '@/types';
 
@@ -16,6 +16,7 @@ interface BudgetTabHeaderProps {
   unallocatedFunds: Category | null;
   unallocatedIncome: number;
   onAddCategoryPress: () => void;
+  incomeLoading?: boolean;
 }
 
 const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
@@ -31,6 +32,7 @@ const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
   unallocatedFunds,
   unallocatedIncome,
   onAddCategoryPress,
+  incomeLoading = false,
 }) => {
   return (
     <View style={styles.header}>
@@ -61,9 +63,16 @@ const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
               {unallocatedFunds.available >= 0 ? '$' : '-$'}{Math.abs(unallocatedFunds.available).toFixed(2)}
             </Text>
             <Text style={styles.incomeLabel}>Income This Period:</Text>
-            <Text style={[styles.incomeValue, unallocatedIncome >= 0 ? styles.positiveValue : styles.negativeValue]}>
-              {unallocatedIncome >= 0 ? '$' : '-$'}{Math.abs(unallocatedIncome).toFixed(2)}
-            </Text>
+            {incomeLoading ? (
+              <View style={styles.incomeLoadingContainer}>
+                <ActivityIndicator size="small" color="#007BFF" />
+                <Text style={styles.incomeLoadingText}>Loading...</Text>
+              </View>
+            ) : (
+              <Text style={[styles.incomeValue, unallocatedIncome >= 0 ? styles.positiveValue : styles.negativeValue]}>
+                {unallocatedIncome >= 0 ? '$' : '-$'}{Math.abs(unallocatedIncome).toFixed(2)}
+              </Text>
+            )}
           </View>
         )}
       </View>
@@ -128,6 +137,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  incomeLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  incomeLoadingText: {
+    fontSize: 14,
+    color: '#007BFF',
+    fontWeight: '500',
   },
 });
 

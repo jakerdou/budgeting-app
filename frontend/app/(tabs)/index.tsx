@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, SafeAreaView, Text, StyleSheet, FlatList, Button, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, SafeAreaView, Text, StyleSheet, FlatList, Button, TouchableOpacity, Alert, Platform, ActivityIndicator } from 'react-native';
 import { useAuth } from '@/context/AuthProvider';
 import { useCategories } from '@/context/CategoriesProvider';
 import AddCategoryModal from '@/components/budget/AddCategoryModal';
@@ -37,6 +37,7 @@ export default function Tab() {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [fixingCategories, setFixingCategories] = useState<Set<string>>(new Set());
+  const [allocatedSpentLoading, setAllocatedSpentLoading] = useState(false);
 
   useEffect(() => {
     if (budgetPeriod === 'monthly') {
@@ -51,6 +52,7 @@ export default function Tab() {
   const fetchAllocatedAndSpent = useCallback(async () => {
     if (user) {
       try {
+        setAllocatedSpentLoading(true);
         const data = await getAllocatedAndSpent(user.uid, startDate, endDate);
         
         // Transform the array response into an object keyed by category_id
@@ -66,6 +68,8 @@ export default function Tab() {
         setUnallocatedIncome(data.unallocated_income);
       } catch (error) {
         console.error('Failed to fetch allocated and spent data', error);
+      } finally {
+        setAllocatedSpentLoading(false);
       }
     }
   }, [user, startDate, endDate]);
@@ -148,11 +152,36 @@ export default function Tab() {
       date: formatDateToYYYYMMDD(new Date()),
     };
 
+    // Store the current allocated amount for potential rollback
+    const currentAllocated = allocatedAndSpent[category.id]?.allocated || 0;
+    const newAllocated = currentAllocated + amountToAllocate;
+
+    // Optimistically update the allocated amount
+    setAllocatedAndSpent(prev => ({
+      ...prev,
+      [category.id]: {
+        allocated: newAllocated,
+        spent: prev[category.id]?.spent || 0
+      }
+    }));
+
+    // Optimistically update unallocated income
+    setUnallocatedIncome(prev => prev - amountToAllocate);
+
     try {
       await createAssignment(assignment);
-      fetchAllocatedAndSpent();
+      // No need to fetch allocated and spent since we updated optimistically
     } catch (error) {
       console.error('Error fixing negative available:', error);
+      // Revert optimistic updates on error - restore the exact previous state
+      setAllocatedAndSpent(prev => ({
+        ...prev,
+        [category.id]: {
+          allocated: currentAllocated,
+          spent: prev[category.id]?.spent || 0
+        }
+      }));
+      setUnallocatedIncome(prev => prev + amountToAllocate);
     } finally {
       // Remove category from fixing set after operation completes
       setFixingCategories(prev => {
@@ -178,11 +207,36 @@ export default function Tab() {
       date: formatDateToYYYYMMDD(new Date()),
     };
 
+    // Store the current allocated amount for potential rollback
+    const currentAllocated = allocatedAndSpent[category.id]?.allocated || 0;
+    const newAllocated = currentAllocated + shortfall;
+
+    // Optimistically update the allocated amount
+    setAllocatedAndSpent(prev => ({
+      ...prev,
+      [category.id]: {
+        allocated: newAllocated,
+        spent: prev[category.id]?.spent || 0
+      }
+    }));
+
+    // Optimistically update unallocated income
+    setUnallocatedIncome(prev => prev - shortfall);
+
     try {
       await createAssignment(assignment);
-      fetchAllocatedAndSpent();
+      // No need to fetch allocated and spent since we updated optimistically
     } catch (error) {
       console.error('Error allocating to goal:', error);
+      // Revert optimistic updates on error - restore the exact previous state
+      setAllocatedAndSpent(prev => ({
+        ...prev,
+        [category.id]: {
+          allocated: currentAllocated,
+          spent: prev[category.id]?.spent || 0
+        }
+      }));
+      setUnallocatedIncome(prev => prev + shortfall);
     }
   };
 
@@ -222,43 +276,52 @@ export default function Tab() {
           <View style={styles.valuesContainer}>
             <View style={styles.mainValuesRow}>
               {/* Quick action buttons */}
-              <View style={styles.actionButtons}>
-                {hasNegativeAvailable && !isBeingFixed && (
-                  <TouchableOpacity
-                    style={styles.fixButton}
-                    onPress={() => handleFixNegativeAvailable(item)}
-                    accessibilityLabel={`Fix negative available for ${item.name}`}
-                  >
-                    <Ionicons name="add-circle" size={20} color="#FF6B6B" />
-                    <Text style={styles.fixButtonText}>Fix</Text>
-                  </TouchableOpacity>
-                )}
-                
-                {isBeingFixed && (
-                  <View style={styles.fixingButton}>
-                    <Ionicons name="checkmark-circle" size={20} color="#28A745" />
-                    <Text style={styles.fixingButtonText}>Fixing...</Text>
-                  </View>
-                )}
-                
-                {hasGoalShortfall && (
-                  <TouchableOpacity
-                    style={styles.goalButton}
-                    onPress={() => handleAllocateToGoal(item)}
-                    accessibilityLabel={`Allocate to goal for ${item.name}`}
-                  >
-                    <Ionicons name="flag" size={20} color="#4ECDC4" />
-                    <Text style={styles.goalButtonText}>Goal</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+              {!allocatedSpentLoading && (
+                <View style={styles.actionButtons}>
+                  {hasNegativeAvailable && !isBeingFixed && (
+                    <TouchableOpacity
+                      style={styles.fixButton}
+                      onPress={() => handleFixNegativeAvailable(item)}
+                      accessibilityLabel={`Fix negative available for ${item.name}`}
+                    >
+                      <Ionicons name="add-circle" size={20} color="#FF6B6B" />
+                      <Text style={styles.fixButtonText}>Fix</Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {isBeingFixed && (
+                    <View style={styles.fixingButton}>
+                      <Ionicons name="checkmark-circle" size={20} color="#28A745" />
+                      <Text style={styles.fixingButtonText}>Fixing...</Text>
+                    </View>
+                  )}
+                  
+                  {hasGoalShortfall && (
+                    <TouchableOpacity
+                      style={styles.goalButton}
+                      onPress={() => handleAllocateToGoal(item)}
+                      accessibilityLabel={`Allocate to goal for ${item.name}`}
+                    >
+                      <Ionicons name="flag" size={20} color="#4ECDC4" />
+                      <Text style={styles.goalButtonText}>Goal</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
 
               <View style={styles.horizontalValuesContainer}>
-                <View style={styles.periodValuesContainer}>
-                  <Text style={[styles.periodLabel]}>This Period:</Text>
-                  <Text style={[styles.periodValue, allocatedAmount < 0 && styles.negativeValue]}>Allocated: {allocatedAmount >= 0 ? '$' : '-$'}{Math.abs(allocatedAmount).toFixed(2)}</Text>
-                  <Text style={[styles.periodValue]}>Spent: {spentAmount >= 0 ? '$' : '-$'}{Math.abs(spentAmount).toFixed(2)}</Text>
-                </View>
+                {allocatedSpentLoading ? (
+                  <View style={styles.loadingPeriodContainer}>
+                    <ActivityIndicator size="small" color="#007BFF" />
+                    <Text style={styles.loadingText}>Loading...</Text>
+                  </View>
+                ) : (
+                  <View style={styles.periodValuesContainer}>
+                    <Text style={[styles.periodLabel]}>This Period:</Text>
+                    <Text style={[styles.periodValue, allocatedAmount < 0 && styles.negativeValue]}>Allocated: {allocatedAmount >= 0 ? '$' : '-$'}{Math.abs(allocatedAmount).toFixed(2)}</Text>
+                    <Text style={[styles.periodValue]}>Spent: {spentAmount >= 0 ? '$' : '-$'}{Math.abs(spentAmount).toFixed(2)}</Text>
+                  </View>
+                )}
                 <View style={[styles.totalValueContainer, { borderLeftColor: item.available >= 0 ? '#28A745' : '#DC3545' }]}>
                   <Text style={[
                     styles.totalValue, 
@@ -307,6 +370,7 @@ export default function Tab() {
         unallocatedFunds={unallocatedFunds}
         unallocatedIncome={unallocatedIncome}
         onAddCategoryPress={() => setModalVisible(true)}
+        incomeLoading={allocatedSpentLoading}
       />
       {categories.length > 0 && (
         <FlatList
@@ -524,5 +588,30 @@ const styles = StyleSheet.create({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  loadingContainer: {
+    flexDirection: 'column',
+    gap: 6,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    minHeight: 44, // Match the height of action buttons
+  },
+  loadingPeriodContainer: {
+    backgroundColor: '#F8F9FA',
+    padding: 8,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#007BFF',
+    flex: 1,
+    minWidth: 140,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#007BFF',
+    fontWeight: '500',
   },
 });

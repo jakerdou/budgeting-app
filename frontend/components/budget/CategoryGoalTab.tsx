@@ -96,21 +96,6 @@ const CategoryGoalTab: React.FC<CategoryGoalTabProps> = ({ category, onGoalUpdat
           </View>
         )}
       </View>
-
-      {currentGoal > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Current Progress</Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progress, { width: `${progressPercentage}%` }]} />
-          </View>
-          <Text style={styles.progressText}>
-            ${currentAllocated.toFixed(2)} of ${currentGoal.toFixed(2)} allocated ({progressPercentage.toFixed(1)}%)
-          </Text>
-          {progressPercentage >= 100 && (
-            <Text style={styles.goalMetText}>🎉 Goal reached!</Text>
-          )}
-        </View>
-      )}
     </View>
   );
 };

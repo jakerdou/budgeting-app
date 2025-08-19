@@ -11,7 +11,7 @@ export default function TabLayout() {
         options={{
           title: 'Budget',
           headerShown: false,
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="dollar" color={color} />,
+          tabBarIcon: ({ color }: { color: string }) => <FontAwesome size={28} name="dollar" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -19,7 +19,15 @@ export default function TabLayout() {
         options={{
           title: 'Transactions',
           headerShown: false,
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="list" color={color} />,
+          tabBarIcon: ({ color }: { color: string }) => <FontAwesome size={28} name="list" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="insights"
+        options={{
+          title: 'Insights',
+          headerShown: false,
+          tabBarIcon: ({ color }: { color: string }) => <FontAwesome size={28} name="bar-chart" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -27,7 +35,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           headerShown: false,
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="cog" color={color} />,
+          tabBarIcon: ({ color }: { color: string }) => <FontAwesome size={28} name="cog" color={color} />,
         }}
       />
     </Tabs>

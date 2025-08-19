@@ -378,6 +378,15 @@ export default function Tab() {
     // let's fetch all transactions to ensure consistency with backend
     fetchTransactions();
   };
+
+  const handleTransactionUpdated = async (updatedTransaction: Transaction) => {
+    // Update the local state with the updated transaction
+    setTransactions(prev => prev.map(t => 
+      t.id === updatedTransaction.id ? updatedTransaction : t
+    ));
+    // Also update the selected transaction if it's the one being displayed
+    setSelectedInfoTransaction(updatedTransaction);
+  };
   
   const toggleTransactionSelection = (transactionId: string) => {
     setSelectedTransactions(prev => {
@@ -478,6 +487,7 @@ export default function Tab() {
         transaction={selectedInfoTransaction}
         category={selectedInfoTransaction ? categories.find(cat => cat.id === selectedInfoTransaction.category_id) || null : null}
         onClose={() => setInfoModalVisible(false)}
+        onTransactionUpdated={handleTransactionUpdated}
       />
       <ConfirmationModal
         visible={deleteConfirmVisible}

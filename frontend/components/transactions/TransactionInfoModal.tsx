@@ -1,22 +1,36 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { Transaction, Category } from '@/types';
+import { updateTransactionDate } from '@/services/transactions';
+import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
 
 interface TransactionInfoModalProps {
   visible: boolean;
   transaction: Transaction | null;
   category: Category | null;
   onClose: () => void;
+  onTransactionUpdated?: (updatedTransaction: Transaction) => void;
 }
 
 export default function TransactionInfoModal({ 
   visible, 
   transaction, 
   category,
-  onClose 
+  onClose,
+  onTransactionUpdated
 }: TransactionInfoModalProps) {
-  if (!transaction) return null;
+  const [localTransaction, setLocalTransaction] = useState<Transaction | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  useEffect(() => {
+    if (transaction) {
+      setLocalTransaction({ ...transaction });
+    }
+  }, [transaction]);
+
+  if (!localTransaction) return null;
 
 //   const formatDate = (dateString: string) => {
 //     const date = new Date(dateString);
@@ -32,8 +46,36 @@ export default function TransactionInfoModal({
     return amount >= 0 ? `+$${absAmount.toFixed(2)}` : `-$${absAmount.toFixed(2)}`;
   };
 
+  const handleDateChange = async (event: any, selectedDate?: Date) => {
+    if (selectedDate && localTransaction) {
+      console.log('Selected date:', selectedDate);
+      const formattedDate = formatDateToYYYYMMDD(selectedDate);
+      console.log('Formatted date:', formattedDate);
+      
+      if (formattedDate !== localTransaction.date) {
+        setIsUpdating(true);
+        try {
+          await updateTransactionDate(localTransaction.user_id, localTransaction.id, formattedDate);
+          
+          const updatedTransaction = { ...localTransaction, date: formattedDate };
+          setLocalTransaction(updatedTransaction);
+          
+          // Notify parent component of the update
+          if (onTransactionUpdated) {
+            onTransactionUpdated(updatedTransaction);
+          }
+        } catch (error) {
+          console.error('Failed to update transaction date:', error);
+          // You might want to show an error message to the user here
+        } finally {
+          setIsUpdating(false);
+        }
+      }
+    }
+  };
+
   const categoryName = category?.name || 'None';
-  const isUncategorized = !transaction.category_id;
+  const isUncategorized = !localTransaction.category_id;
 
   return (
     <Modal
@@ -56,7 +98,7 @@ export default function TransactionInfoModal({
             
             <View style={styles.infoRow}>
               <Text style={styles.label}>Name:</Text>
-              <Text style={styles.value}>{transaction.name}</Text>
+              <Text style={styles.value}>{localTransaction.name}</Text>
             </View>
 
             <View style={styles.infoRow}>
@@ -64,16 +106,53 @@ export default function TransactionInfoModal({
               <Text style={[
                 styles.value,
                 styles.amountText,
-                parseFloat(transaction.amount.toString()) > 0 ? styles.positiveAmount : styles.negativeAmount
+                parseFloat(localTransaction.amount.toString()) > 0 ? styles.positiveAmount : styles.negativeAmount
               ]}>
-                {formatAmount(parseFloat(transaction.amount.toString()))}
+                {formatAmount(parseFloat(localTransaction.amount.toString()))}
               </Text>
             </View>
 
             <View style={styles.infoRow}>
               <Text style={styles.label}>Date:</Text>
-              <Text style={styles.value}>{transaction.date}</Text>
-              {/* <Text style={styles.value}>{formatDate(transaction.date)}</Text> */}
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={localTransaction.date}
+                  onChange={(e) => {
+                    // Use the date string directly instead of creating a Date object
+                    // which can cause timezone issues
+                    const dateStr = e.target.value;
+                    if (dateStr && dateStr !== localTransaction.date) {
+                      // Create a Date object for the handleDateChange function
+                      // but use local time interpretation to avoid timezone issues
+                      const [year, month, day] = dateStr.split('-').map(Number);
+                      const date = new Date(year, month - 1, day);
+                      handleDateChange(null, date);
+                    }
+                  }}
+                  // Remove any potential date restrictions
+                  min=""
+                  max=""
+                  style={{ 
+                    fontSize: 16,
+                    color: '#333',
+                    textAlign: 'right',
+                    border: 'none',
+                    background: 'transparent',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                  disabled={isUpdating}
+                />
+              ) : (
+                <DateTimePicker
+                  value={new Date(localTransaction.date)}
+                  mode="date"
+                  display="default"
+                  onChange={handleDateChange}
+                  disabled={isUpdating}
+                />
+              )}
             </View>
 
             <View style={styles.infoRow}>
@@ -88,7 +167,7 @@ export default function TransactionInfoModal({
 
             <View style={styles.infoRow}>
               <Text style={styles.label}>Account:</Text>
-              <Text style={styles.value}>{transaction.account_name}</Text>
+              <Text style={styles.value}>{localTransaction.account_name}</Text>
             </View>
           </View>
 
@@ -97,12 +176,12 @@ export default function TransactionInfoModal({
             
             <View style={styles.infoRow}>
               <Text style={styles.label}>Transaction ID:</Text>
-              <Text style={styles.value}>{transaction.id}</Text>
+              <Text style={styles.value}>{localTransaction.id}</Text>
             </View>
 
             <View style={styles.infoRow}>
               <Text style={styles.label}>User ID:</Text>
-              <Text style={styles.value}>{transaction.user_id}</Text>
+              <Text style={styles.value}>{localTransaction.user_id}</Text>
             </View>
           </View>
         </ScrollView>
