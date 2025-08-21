@@ -5,13 +5,11 @@ import { useAuth } from '@/context/AuthProvider';
 import { useCategories } from '@/context/CategoriesProvider';
 import DatePickers from '@/components/budget/DatePickers';
 import CategoryInfoModal from '@/components/budget/CategoryInfoModal';
-import { getAllocatedAndSpent } from '@/services/categories';
-import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
+import { useBudgetPeriod } from '@/hooks/useBudgetPeriod';
+import { useAllocatedAndSpent } from '@/hooks/useAllocatedAndSpent';
+import { useCategoryHandlers } from '@/hooks/useCategoryHandlers';
 import {
-  setMonthlyDates,
-  setBiWeeklyDates,
-  setYearlyDates,
   setPreviousBudgetPeriodTimeFrame,
   setNextBudgetPeriodTimeFrame,
 } from '@/utils/dateUtils';
@@ -19,77 +17,32 @@ import {
 export default function InsightsScreen() {
   const { user } = useAuth();
   const { categories, loading, unallocatedFunds } = useCategories();
-  const [allocatedAndSpent, setAllocatedAndSpent] = useState<{[categoryId: string]: {allocated: number, spent: number}}>({});
-  const [unallocatedIncome, setUnallocatedIncome] = useState<number>(0);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [budgetPeriod, setBudgetPeriod] = useState(user?.preferences.budget_period);
-  const [allocatedSpentLoading, setAllocatedSpentLoading] = useState(false);
+  const {
+    startDate,
+    endDate,
+    budgetPeriod,
+    setStartDate,
+    setEndDate,
+    setBudgetPeriod,
+  } = useBudgetPeriod(user);
+  const {
+    allocatedAndSpent,
+    unallocatedIncome,
+    loading: allocatedSpentLoading,
+    fetchAllocatedAndSpent,
+    getSpentAmount,
+  } = useAllocatedAndSpent(user, startDate, endDate);
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [selectedInfoCategory, setSelectedInfoCategory] = useState<any>(null);
 
-  useEffect(() => {
-    if (budgetPeriod === 'monthly') {
-      setMonthlyDates(setStartDate, setEndDate);
-    } else if (budgetPeriod === 'bi-weekly') {
-      setBiWeeklyDates(user?.preferences.pay_schedule || {}, setStartDate, setEndDate);
-    } else if (budgetPeriod === 'yearly') {
-      setYearlyDates(setStartDate, setEndDate);
-    }
-  }, [budgetPeriod, user]);
-
-  const fetchAllocatedAndSpent = useCallback(async () => {
-    if (user) {
-      try {
-        setAllocatedSpentLoading(true);
-        const data = await getAllocatedAndSpent(user.uid, startDate, endDate);
-        
-        // Transform the array response into an object keyed by category_id
-        const transformedData: {[categoryId: string]: {allocated: number, spent: number}} = {};
-        data.allocated_and_spent?.forEach((item: any) => {
-          transformedData[item.category_id] = {
-            allocated: item.allocated,
-            spent: item.spent
-          };
-        });
-        
-        setAllocatedAndSpent(transformedData);
-        setUnallocatedIncome(data.unallocated_income || 0);
-      } catch (error) {
-        console.error('Failed to fetch allocated and spent data', error);
-      } finally {
-        setAllocatedSpentLoading(false);
-      }
-    }
-  }, [user, startDate, endDate]);
-
-  useEffect(() => {
-    if (startDate && endDate) {
-      fetchAllocatedAndSpent();
-    }
-  }, [fetchAllocatedAndSpent]);
-
-  const getSpentAmount = (categoryId: string) => {
-    return allocatedAndSpent[categoryId]?.spent || 0;
-  };
-
-  const handleCategoryNameUpdate = (categoryId: string, newName: string) => {
-    // This will trigger a re-render of the categories from the context
-    // The useCategories hook should automatically refresh the categories
-    fetchAllocatedAndSpent();
-  };
-
-  const handleCategoryGoalUpdate = (categoryId: string, goalAmount: number | null) => {
-    // Update the selected category's goal amount immediately
-    if (selectedInfoCategory && selectedInfoCategory.id === categoryId) {
-      setSelectedInfoCategory({
-        ...selectedInfoCategory,
-        goal_amount: goalAmount || undefined
-      });
-    }
-    // Also refresh the categories to ensure everything is in sync
-    fetchAllocatedAndSpent();
-  };
+  const {
+    handleCategoryNameUpdate,
+    handleCategoryGoalUpdate,
+  } = useCategoryHandlers(
+    fetchAllocatedAndSpent,
+    selectedInfoCategory,
+    setSelectedInfoCategory
+  );
 
   const totalSpent = Object.values(allocatedAndSpent).reduce((sum, item) => sum + item.spent, 0);
 

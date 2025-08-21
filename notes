@@ -5,8 +5,12 @@ put search bar in transactions page, will need to do this in backend because of 
 add today button next to date picker that will take you to teh range of dates that includes today
 put more transaction info in the transaction info modal, will need to save in db like just more descriptive fields. theres a problem with some of the transaction names not being descriptive enough e.g. 'aplpay store'
 create new table CategoryGroup? to be able to group categories so that they show up grouped in the frontend
+put alert in top of transactions tab if there are uncategorized transactions
 
 put handle category name update in its own file, it's in a couple now. we can also do this with 
+
+CODE DUPLICATION TO FIX:
+    • create useModal() hook - modal state management pattern repeated everywhere
 
 add splitting transaction amount to different categories
 add note about no categories if there aren't any

@@ -12,10 +12,10 @@ import { createAssignment } from '@/services/assignments';
 import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
 import { Category } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
+import { useBudgetPeriod } from '@/hooks/useBudgetPeriod';
+import { useAllocatedAndSpent } from '@/hooks/useAllocatedAndSpent';
+import { useCategoryHandlers } from '@/hooks/useCategoryHandlers';
 import {
-  setMonthlyDates,
-  setBiWeeklyDates,
-  setYearlyDates,
   setPreviousBudgetPeriodTimeFrame,
   setNextBudgetPeriodTimeFrame,
 } from '@/utils/dateUtils';
@@ -23,13 +23,26 @@ import {
 export default function Tab() {
   const { user } = useAuth();
   const { categories, loading, unallocatedFunds } = useCategories();
-  const [allocatedAndSpent, setAllocatedAndSpent] = useState<{[categoryId: string]: {allocated: number, spent: number}}>({});
-  const [unallocatedIncome, setUnallocatedIncome] = useState<number>(0);
+  const {
+    startDate,
+    endDate,
+    budgetPeriod,
+    setStartDate,
+    setEndDate,
+    setBudgetPeriod,
+  } = useBudgetPeriod(user);
+  const {
+    allocatedAndSpent,
+    unallocatedIncome,
+    loading: allocatedSpentLoading,
+    fetchAllocatedAndSpent,
+    getAllocatedAmount,
+    getSpentAmount,
+    setAllocatedAndSpent,
+    setUnallocatedIncome,
+  } = useAllocatedAndSpent(user, startDate, endDate);
   const [modalVisible, setModalVisible] = useState(false);
-  const [startDate, setStartDate] = useState(''); // Using string dates now
-  const [endDate, setEndDate] = useState(''); // Using string dates now
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [budgetPeriod, setBudgetPeriod] = useState(user?.preferences.budget_period);
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [selectedInfoCategory, setSelectedInfoCategory] = useState<Category | null>(null);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
@@ -37,56 +50,15 @@ export default function Tab() {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [fixingCategories, setFixingCategories] = useState<Set<string>>(new Set());
-  const [allocatedSpentLoading, setAllocatedSpentLoading] = useState(false);
 
-  useEffect(() => {
-    if (budgetPeriod === 'monthly') {
-      setMonthlyDates(setStartDate, setEndDate);
-    } else if (budgetPeriod === 'bi-weekly') {
-      setBiWeeklyDates(user?.preferences.pay_schedule || {}, setStartDate, setEndDate);
-    } else if (budgetPeriod === 'yearly') {
-      setYearlyDates(setStartDate, setEndDate);
-    }
-  }, [budgetPeriod, user]);
-
-  const fetchAllocatedAndSpent = useCallback(async () => {
-    if (user) {
-      try {
-        setAllocatedSpentLoading(true);
-        const data = await getAllocatedAndSpent(user.uid, startDate, endDate);
-        
-        // Transform the array response into an object keyed by category_id
-        const transformedData: {[categoryId: string]: {allocated: number, spent: number}} = {};
-        data.allocated_and_spent?.forEach((item: any) => {
-          transformedData[item.category_id] = {
-            allocated: item.allocated,
-            spent: item.spent
-          };
-        });
-        
-        setAllocatedAndSpent(transformedData);
-        setUnallocatedIncome(data.unallocated_income);
-      } catch (error) {
-        console.error('Failed to fetch allocated and spent data', error);
-      } finally {
-        setAllocatedSpentLoading(false);
-      }
-    }
-  }, [user, startDate, endDate]);
-
-  useEffect(() => {
-    if (startDate && endDate) {
-      fetchAllocatedAndSpent();
-    }
-  }, [fetchAllocatedAndSpent]);
-
-  const getAllocatedAmount = (categoryId: string) => {
-    return allocatedAndSpent[categoryId]?.allocated || 0;
-  };
-
-  const getSpentAmount = (categoryId: string) => {
-    return allocatedAndSpent[categoryId]?.spent || 0;
-  };
+  const {
+    handleCategoryNameUpdate,
+    handleCategoryGoalUpdate,
+  } = useCategoryHandlers(
+    fetchAllocatedAndSpent,
+    selectedInfoCategory,
+    setSelectedInfoCategory
+  );
 
   const handleCategoryDelete = (category: Category) => {
     console.log('Deleting category:', category, user);
@@ -115,24 +87,6 @@ export default function Tab() {
   const cancelCategoryDelete = () => {
     setDeleteConfirmVisible(false);
     setCategoryToDelete(null);
-  };
-
-  const handleCategoryNameUpdate = (categoryId: string, newName: string) => {
-    // This will trigger a re-render of the categories from the context
-    // The useCategories hook should automatically refresh the categories
-    fetchAllocatedAndSpent();
-  };
-
-  const handleCategoryGoalUpdate = (categoryId: string, goalAmount: number | null) => {
-    // Update the selected category's goal amount immediately
-    if (selectedInfoCategory && selectedInfoCategory.id === categoryId) {
-      setSelectedInfoCategory({
-        ...selectedInfoCategory,
-        goal_amount: goalAmount || undefined
-      });
-    }
-    // Also refresh the categories to ensure everything is in sync
-    fetchAllocatedAndSpent();
   };
 
   const handleFixNegativeAvailable = async (category: Category) => {
