@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { BarChart } from 'react-native-chart-kit';
+import { BarChart, PieChart } from 'react-native-chart-kit';
 import { useAuth } from '@/context/AuthProvider';
 import { useCategories } from '@/context/CategoriesProvider';
 import DatePickers from '@/components/budget/DatePickers';
 import CategoryInfoModal from '@/components/budget/CategoryInfoModal';
+import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { useBudgetPeriod } from '@/hooks/useBudgetPeriod';
 import { useAllocatedAndSpent } from '@/hooks/useAllocatedAndSpent';
@@ -38,11 +39,11 @@ export default function InsightsScreen() {
   const {
     handleCategoryNameUpdate,
     handleCategoryGoalUpdate,
-  } = useCategoryHandlers(
+  } = useCategoryHandlers({
     fetchAllocatedAndSpent,
     selectedInfoCategory,
-    setSelectedInfoCategory
-  );
+    setSelectedInfoCategory,
+  });
 
   const totalSpent = Object.values(allocatedAndSpent).reduce((sum, item) => sum + item.spent, 0);
 
@@ -92,6 +93,17 @@ export default function InsightsScreen() {
       },
     ],
   };
+
+  // Prepare pie chart data - only include categories with spending > 0
+  const pieChartData = chartData
+    .filter(item => item.spent > 0)
+    .map((item, index) => ({
+      name: item.name.length > 12 ? item.name.substring(0, 12) + '...' : item.name,
+      population: item.spent,
+      color: `hsl(${(index * 45) % 360}, 70%, 60%)`, // Generate distinct colors
+      legendFontColor: '#333333',
+      legendFontSize: 12,
+    }));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -146,26 +158,53 @@ export default function InsightsScreen() {
               </Text>
             </View>
 
-            {/* Spending Chart */}
+            {/* Charts Section - Bar Chart and Pie Chart Side by Side */}
             {chartData.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Spending by Category</Text>
-                <View style={styles.chartContainer}>
-                  <BarChart
-                    data={barChartData}
-                    width={screenWidth / 2 - 32} // Account for padding
-                    height={220}
-                    chartConfig={chartConfig}
-                  //   verticalLabelRotation={30}
-                    fromZero={true}
-                    showBarTops={false}
-                    yAxisLabel="$"
-                    yAxisSuffix=""
-                    style={{
-                      borderRadius: 16,
-                    }}
-                    showValuesOnTopOfBars={true}
-                  />
+                <Text style={styles.sectionTitle}>Spending Analytics</Text>
+                <View style={styles.chartsRow}>
+                  {/* Bar Chart */}
+                  <View style={styles.chartBarContainer}>
+                    {/* <Text style={styles.chartSubtitle}>By Category</Text> */}
+                    <View style={styles.chartContainer}>
+                      <BarChart
+                        data={barChartData}
+                        width={(screenWidth * 0.7) - 32} // 70% of screen width minus padding
+                        height={200}
+                        chartConfig={chartConfig}
+                        fromZero={true}
+                        showBarTops={false}
+                        yAxisLabel="$"
+                        yAxisSuffix=""
+                        style={{
+                          borderRadius: 16,
+                        }}
+                        showValuesOnTopOfBars={true}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Pie Chart */}
+                  {pieChartData.length > 0 && (
+                    <View style={styles.chartPieContainer}>
+                      {/* <Text style={styles.chartSubtitle}>Distribution</Text> */}
+                      <View style={styles.chartContainer}>
+                        <PieChart
+                          data={pieChartData}
+                          width={(screenWidth * 0.3) - 24} // 30% of screen width minus padding
+                          height={200}
+                          chartConfig={{
+                            color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                          }}
+                          accessor="population"
+                          backgroundColor="transparent"
+                          paddingLeft="10"
+                          center={[0, 0]}
+                          absolute
+                        />
+                      </View>
+                    </View>
+                  )}
                 </View>
               </View>
             )}
@@ -400,5 +439,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#007BFF',
     fontWeight: '500',
+  },
+  chartsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 16,
+  },
+  chartHalf: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  chartBarContainer: {
+    flex: 0.7,
+    alignItems: 'center',
+  },
+  chartPieContainer: {
+    flex: 0.3,
+    alignItems: 'center',
+  },
+  chartSubtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
   },
 });

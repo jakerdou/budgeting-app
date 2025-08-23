@@ -7,7 +7,7 @@ import AssignmentModal from '@/components/budget/AssignmentModal';
 import CategoryInfoModal from '@/components/budget/CategoryInfoModal';
 import ConfirmationModal from '@/components/budget/ConfirmationModal';
 import BudgetTabHeader from '@/components/budget/BudgetTabHeader';
-import { getAllocatedAndSpent, deleteCategory } from '@/services/categories';
+import { deleteCategory } from '@/services/categories';
 import { createAssignment } from '@/services/assignments';
 import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
 import { Category } from '@/types';
@@ -54,11 +54,11 @@ export default function Tab() {
   const {
     handleCategoryNameUpdate,
     handleCategoryGoalUpdate,
-  } = useCategoryHandlers(
+  } = useCategoryHandlers({
     fetchAllocatedAndSpent,
     selectedInfoCategory,
-    setSelectedInfoCategory
-  );
+    setSelectedInfoCategory,
+  });
 
   const handleCategoryDelete = (category: Category) => {
     console.log('Deleting category:', category, user);

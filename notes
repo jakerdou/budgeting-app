@@ -12,6 +12,8 @@ put handle category name update in its own file, it's in a couple now. we can al
 CODE DUPLICATION TO FIX:
     • create useModal() hook - modal state management pattern repeated everywhere
 
+allocating at times can reduce income from this period number on screen
+
 add splitting transaction amount to different categories
 add note about no categories if there aren't any
 
