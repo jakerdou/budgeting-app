@@ -9,6 +9,7 @@ class Category(FirestoreModel):
     
     name: str
     user_id: str
+    group_id: Optional[str] = None
     available: Decimal = Decimal('0.0')
     is_unallocated_funds: bool = False
     goal_amount: Optional[Decimal] = None

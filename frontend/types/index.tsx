@@ -4,6 +4,7 @@ export type Category = {
     allocated: number;
     available: number;
     goal_amount?: number;
+    group_id?: string;
 };
 
 export type Transaction = {

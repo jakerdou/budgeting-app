@@ -4,7 +4,8 @@ import { Category } from '@/types';
 import CategoryGoalTab from './CategoryGoalTab';
 import CategoryTransactionsTab from './CategoryTransactionsTab';
 import { useAuth } from '@/context/AuthProvider';
-import { updateCategoryName } from '@/services/categories';
+import { useCategories } from '@/context/CategoriesProvider';
+import { updateCategoryName, updateCategoryGroup } from '@/services/categories';
 
 interface CategoryInfoModalProps {
   visible: boolean;
@@ -14,22 +15,27 @@ interface CategoryInfoModalProps {
   endDate: string;
   onCategoryNameUpdate?: (categoryId: string, newName: string) => void;
   onCategoryGoalUpdate?: (categoryId: string, goalAmount: number | null) => void;
+  onCategoryGroupUpdate?: (categoryId: string, groupId: string | null) => void;
 }
 
-const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category, onClose, startDate, endDate, onCategoryNameUpdate, onCategoryGoalUpdate }) => {
+const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category, onClose, startDate, endDate, onCategoryNameUpdate, onCategoryGoalUpdate, onCategoryGroupUpdate }) => {
   const { user } = useAuth();
+  const { categoryGroups } = useCategories();
   const [activeTab, setActiveTab] = useState('goals');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
   const [currentDisplayName, setCurrentDisplayName] = useState(category?.name || '');
+  const [isSavingGroup, setIsSavingGroup] = useState(false);
+  const [currentGroupId, setCurrentGroupId] = useState<string | null>(category?.group_id || null);
   
-  // Update display name when category prop changes - must be before early return
+  // Update display name and group when category prop changes - must be before early return
   React.useEffect(() => {
     if (category) {
       setCurrentDisplayName(category.name);
+      setCurrentGroupId(category.group_id || null);
     }
-  }, [category?.name]);
+  }, [category?.name, category?.group_id]);
   
   if (!category) return null;
 
@@ -64,6 +70,28 @@ const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category
       Alert.alert('Error', 'Failed to update category name');
     } finally {
       setIsSavingName(false);
+    }
+  };
+
+  const handleGroupChange = async (groupId: string | null) => {
+    if (!category || !user) return;
+    
+    // Immediately update the local state for instant UI feedback
+    setCurrentGroupId(groupId);
+    setIsSavingGroup(true);
+    
+    try {
+      await updateCategoryGroup(user.uid, category.id, groupId);
+      if (onCategoryGroupUpdate) {
+        onCategoryGroupUpdate(category.id, groupId);
+      }
+    } catch (error) {
+      console.error('Error updating category group:', error);
+      Alert.alert('Error', 'Failed to update category group');
+      // Revert the local state on error
+      setCurrentGroupId(category.group_id || null);
+    } finally {
+      setIsSavingGroup(false);
     }
   };
   
@@ -107,6 +135,51 @@ const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>×</Text>
             </TouchableOpacity>
+          </View>
+          
+          {/* Category Group Dropdown */}
+          <View style={styles.groupSection}>
+            <Text style={styles.groupLabel}>Category Group:</Text>
+            <View style={styles.groupDropdownContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.groupOption,
+                    !currentGroupId && styles.selectedGroupOption
+                  ]}
+                  onPress={() => handleGroupChange(null)}
+                  disabled={isSavingGroup}
+                >
+                  <Text style={[
+                    styles.groupOptionText,
+                    !currentGroupId && styles.selectedGroupOptionText
+                  ]}>
+                    No Group
+                  </Text>
+                </TouchableOpacity>
+                {categoryGroups.map((group) => (
+                  <TouchableOpacity
+                    key={group.id}
+                    style={[
+                      styles.groupOption,
+                      currentGroupId === group.id && styles.selectedGroupOption
+                    ]}
+                    onPress={() => handleGroupChange(group.id)}
+                    disabled={isSavingGroup}
+                  >
+                    <Text style={[
+                      styles.groupOptionText,
+                      currentGroupId === group.id && styles.selectedGroupOptionText
+                    ]}>
+                      {group.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              {isSavingGroup && (
+                <Text style={styles.savingText}>Updating...</Text>
+              )}
+            </View>
           </View>
           
           <View style={styles.tabContainer}>
@@ -306,6 +379,52 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  groupSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  groupLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: '#333',
+  },
+  groupDropdownContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  groupOptions: {
+    flex: 1,
+  },
+  groupOption: {
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  selectedGroupOption: {
+    backgroundColor: '#007BFF',
+    borderColor: '#007BFF',
+  },
+  groupOptionText: {
+    fontSize: 14,
+    color: '#495057',
+    fontWeight: '500',
+  },
+  selectedGroupOptionText: {
+    color: 'white',
+  },
+  savingText: {
+    fontSize: 12,
+    color: '#007BFF',
+    fontStyle: 'italic',
+    marginLeft: 10,
   },
 });
 

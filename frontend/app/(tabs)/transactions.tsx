@@ -403,6 +403,9 @@ export default function Tab() {
   // the filtered results from the API
   const displayedTransactions = transactions;
 
+  // Check if there are any uncategorized transactions in the current list
+  const hasUncategorizedTransactions = transactions.some(transaction => !transaction.category_id);
+
   // console.log('transactions[0]:', transactions[0]);
   
   return (
@@ -414,6 +417,7 @@ export default function Tab() {
         categories={categories}
         selectedCategoryId={selectedCategoryId}
         onCategoryFilterChange={(categoryId) => setSelectedCategoryId(categoryId)}
+        hasUncategorizedTransactions={hasUncategorizedTransactions}
       />
       {selectedTransactions.length > 0 && (
         <BulkCategorySelectionBar 

@@ -10,12 +10,23 @@ type Category = {
   allocated: number;
   available: number;
   is_unallocated_funds?: boolean;
+  group_id?: string;
   // add other category fields if needed
+};
+
+type CategoryGroup = {
+  id: string;
+  name: string;
+  user_id: string;
+  sort_order: number;
+  created_at: string;
 };
 
 type CategoriesContextType = {
   categories: Category[];
+  categoryGroups: CategoryGroup[];
   loading: boolean;
+  groupsLoading: boolean;
   unallocatedFunds: Category | null;
 };
 
@@ -24,7 +35,9 @@ const CategoriesContext = createContext<CategoriesContextType | undefined>(undef
 export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [groupsLoading, setGroupsLoading] = useState(true);
   const [unallocatedFunds, setUnallocatedFunds] = useState<Category | null>(null);
 
   useEffect(() => {
@@ -34,13 +47,16 @@ export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const categoriesQuery = query(
       collection(db, 'categories'),
       where('user_id', '==', user.uid)
-    );    // Subscribe to Firestore updates
-    const unsubscribe = onSnapshot(categoriesQuery, (snapshot) => {
+    );
+
+    // Subscribe to Firestore updates for categories
+    const unsubscribeCategories = onSnapshot(categoriesQuery, (snapshot) => {
       const fetchedCategories: Category[] = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       } as Category));
-        // Sort categories: Unallocated Funds at top, rest alphabetically
+
+      // Sort categories: Unallocated Funds at top, rest alphabetically
       const sortedCategories = [...fetchedCategories].sort((a, b) => {
         // Always put Unallocated Funds at the top
         if (a.is_unallocated_funds) return -1;
@@ -50,7 +66,6 @@ export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
       });
       
-      // console.log('Fetched categories:', sortedCategories);
       setCategories(sortedCategories);
       
       // Find the unallocated funds category
@@ -60,12 +75,40 @@ export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setLoading(false);
     });
 
-    // Clean up the listener when component unmounts
-    return () => unsubscribe();
+    // Create a query to get category groups for the current user
+    const categoryGroupsQuery = query(
+      collection(db, 'category_groups'),
+      where('user_id', '==', user.uid)
+    );
+
+    // Subscribe to Firestore updates for category groups
+    const unsubscribeCategoryGroups = onSnapshot(categoryGroupsQuery, (snapshot) => {
+      const fetchedCategoryGroups: CategoryGroup[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      } as CategoryGroup));
+
+      // Sort category groups by sort_order, then by name
+      const sortedCategoryGroups = [...fetchedCategoryGroups].sort((a, b) => {
+        if (a.sort_order !== b.sort_order) {
+          return a.sort_order - b.sort_order;
+        }
+        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+      });
+      
+      setCategoryGroups(sortedCategoryGroups);
+      setGroupsLoading(false);
+    });
+
+    // Clean up the listeners when component unmounts
+    return () => {
+      unsubscribeCategories();
+      unsubscribeCategoryGroups();
+    };
   }, [user]);
 
   return (
-    <CategoriesContext.Provider value={{ categories, loading, unallocatedFunds }}>
+    <CategoriesContext.Provider value={{ categories, categoryGroups, loading, groupsLoading, unallocatedFunds }}>
       {children}
     </CategoriesContext.Provider>
   );

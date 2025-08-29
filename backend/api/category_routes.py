@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
+from typing import Optional
 from .db import db
 from backend.db.schemas import Category as CategorySchema
 
@@ -48,6 +49,11 @@ class UpdateCategoryGoalRequest(BaseModel):
     category_id: str
     user_id: str
     goal_amount: Decimal
+
+class UpdateCategoryGroupRequest(BaseModel):
+    category_id: str
+    user_id: str
+    group_id: Optional[str] = None  # None means remove from group
 
 # Category Methods
 @router.post("/get-categories")
@@ -289,6 +295,42 @@ async def update_category_goal(request: UpdateCategoryGoalRequest):
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update category goal: {str(e)}")
+
+@router.post("/update-category-group")
+async def update_category_group(request: UpdateCategoryGroupRequest):
+    try:
+        # Verify the category exists and belongs to the user
+        category_ref = db.collection("categories").document(request.category_id)
+        category_doc = category_ref.get()
+        
+        if not category_doc.exists:
+            raise HTTPException(status_code=404, detail="Category not found")
+            
+        category_data = category_doc.to_dict()
+        if category_data.get("user_id") != request.user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to update this category")
+        
+        # If group_id is provided, verify it exists and belongs to the user
+        if request.group_id:
+            group_ref = db.collection("category_groups").document(request.group_id)
+            group_doc = group_ref.get()
+            
+            if not group_doc.exists:
+                raise HTTPException(status_code=404, detail="Category group not found")
+                
+            group_data = group_doc.to_dict()
+            if group_data.get("user_id") != request.user_id:
+                raise HTTPException(status_code=403, detail="Not authorized to use this category group")
+        
+        # Update the category group
+        category_ref.update({"group_id": request.group_id})
+        
+        return {"message": "Category group updated successfully"}
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update category group: {str(e)}")
 
 @router.post("/delete-category")
 async def delete_category(request: DeleteCategoryRequest):

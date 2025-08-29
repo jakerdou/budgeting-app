@@ -110,3 +110,25 @@ export const updateCategoryGoal = async (userId: string, categoryId: string, goa
     const data = await response.json();
     return data;
 };
+
+export const updateCategoryGroup = async (userId: string, categoryId: string, groupId: string | null) => {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}${process.env.EXPO_PUBLIC_CATEGORY_PREFIX}/update-category-group`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            category_id: categoryId,
+            group_id: groupId,
+        }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update category group');
+    }
+
+    const data = await response.json();
+    return data;
+};

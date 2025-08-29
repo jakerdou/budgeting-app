@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, SafeAreaView, Text, StyleSheet, FlatList, Button, TouchableOpacity, Alert, Platform, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, SafeAreaView, Text, StyleSheet, FlatList, Button, TouchableOpacity, Alert, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { useAuth } from '@/context/AuthProvider';
 import { useCategories } from '@/context/CategoriesProvider';
 import AddCategoryModal from '@/components/budget/AddCategoryModal';
+import AddCategoryGroupModal from '@/components/budget/AddCategoryGroupModal';
 import AssignmentModal from '@/components/budget/AssignmentModal';
 import CategoryInfoModal from '@/components/budget/CategoryInfoModal';
 import ConfirmationModal from '@/components/budget/ConfirmationModal';
@@ -22,7 +23,7 @@ import {
 
 export default function Tab() {
   const { user } = useAuth();
-  const { categories, loading, unallocatedFunds } = useCategories();
+  const { categories, categoryGroups, loading, groupsLoading, unallocatedFunds } = useCategories();
   const {
     startDate,
     endDate,
@@ -42,6 +43,7 @@ export default function Tab() {
     setUnallocatedIncome,
   } = useAllocatedAndSpent(user, startDate, endDate);
   const [modalVisible, setModalVisible] = useState(false);
+  const [categoryGroupModalVisible, setCategoryGroupModalVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [selectedInfoCategory, setSelectedInfoCategory] = useState<Category | null>(null);
@@ -50,6 +52,120 @@ export default function Tab() {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [fixingCategories, setFixingCategories] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // Initialize expanded groups when category groups are loaded
+  useEffect(() => {
+    if (!groupsLoading && categoryGroups.length > 0) {
+      const allGroupIds = categoryGroups.map(group => group.id);
+      allGroupIds.push('ungrouped'); // Add ungrouped section
+      setExpandedGroups(new Set(allGroupIds));
+    }
+  }, [categoryGroups, groupsLoading]);
+
+  // Group categories by their group_id
+  const groupedCategories = useMemo(() => {
+    const nonUnallocatedCategories = categories.filter((category: any) => !category.is_unallocated_funds);
+    
+    const groups: { [key: string]: Category[] } = {};
+    const ungrouped: Category[] = [];
+    
+    nonUnallocatedCategories.forEach((category: Category) => {
+      if (category.group_id) {
+        if (!groups[category.group_id]) {
+          groups[category.group_id] = [];
+        }
+        groups[category.group_id].push(category);
+      } else {
+        ungrouped.push(category);
+      }
+    });
+    
+    return { groups, ungrouped };
+  }, [categories]);
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(groupId)) {
+        newExpanded.delete(groupId);
+      } else {
+        newExpanded.add(groupId);
+      }
+      return newExpanded;
+    });
+  };
+
+  const renderGroupHeader = (groupId: string, groupName: string, categories: Category[]) => {
+    const isExpanded = expandedGroups.has(groupId);
+    
+    // Calculate total allocated and spent for the group
+    const groupTotals = categories.reduce((totals, category) => {
+      const allocated = getAllocatedAmount(category.id);
+      const spent = getSpentAmount(category.id);
+      return {
+        allocated: totals.allocated + allocated,
+        spent: totals.spent + spent,
+      };
+    }, { allocated: 0, spent: 0 });
+    
+    return (
+      <TouchableOpacity
+        style={styles.groupHeader}
+        onPress={() => toggleGroup(groupId)}
+        accessibilityLabel={`${isExpanded ? 'Collapse' : 'Expand'} ${groupName} group`}
+      >
+        <View style={styles.groupHeaderLeft}>
+          <Ionicons 
+            name={isExpanded ? 'chevron-down' : 'chevron-forward'} 
+            size={20} 
+            color="#007BFF" 
+          />
+          <Text style={styles.groupTitle}>{groupName}</Text>
+          <Text style={styles.groupCount}>({categories.length})</Text>
+        </View>
+        <View style={styles.groupTotals}>
+          <Text style={styles.groupTotalText}>
+            Allocated: ${groupTotals.allocated.toFixed(2)}
+          </Text>
+          <Text style={styles.groupTotalText}>
+            Spent: ${groupTotals.spent.toFixed(2)}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderCategoriesInGroup = (categories: Category[]) => {
+    return categories.map((category) => (
+      <View key={category.id} style={styles.groupedCategoryItem}>
+        {renderItem({ item: category })}
+      </View>
+    ));
+  };
+
+  // Log category groups to console for demonstration
+  useEffect(() => {
+    if (!groupsLoading && categoryGroups.length >= 0) {
+      console.log('=== Category Groups ===');
+      console.log('Groups loading:', groupsLoading);
+      console.log('Number of groups:', categoryGroups.length);
+      console.log('Category groups:', categoryGroups);
+      
+      if (categoryGroups.length > 0) {
+        categoryGroups.forEach((group, index) => {
+          console.log(`Group ${index + 1}:`, {
+            id: group.id,
+            name: group.name,
+            sortOrder: group.sort_order,
+            createdAt: group.created_at
+          });
+        });
+      } else {
+        console.log('No category groups found');
+      }
+    }
+  }, [categoryGroups, groupsLoading]);
 
   const {
     handleCategoryNameUpdate,
@@ -324,15 +440,41 @@ export default function Tab() {
         unallocatedFunds={unallocatedFunds}
         unallocatedIncome={unallocatedIncome}
         onAddCategoryPress={() => setModalVisible(true)}
+        onAddCategoryGroupPress={() => setCategoryGroupModalVisible(true)}
         incomeLoading={allocatedSpentLoading}
       />
       {categories.length > 0 && (
-        <FlatList
-          data={categories.filter((category: any) => !category.is_unallocated_funds)}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-        />
+        <ScrollView contentContainerStyle={styles.listContent}>
+          {/* Render groups with categories */}
+          {Object.entries(groupedCategories.groups).map(([groupId, categories]) => {
+            const group = categoryGroups.find(g => g.id === groupId);
+            const groupName = group?.name || 'Unknown Group';
+            const isExpanded = expandedGroups.has(groupId);
+            
+            return (
+              <View key={groupId} style={styles.groupSection}>
+                {renderGroupHeader(groupId, groupName, categories)}
+                {isExpanded && (
+                  <View style={styles.groupContent}>
+                    {renderCategoriesInGroup(categories)}
+                  </View>
+                )}
+              </View>
+            );
+          })}
+          
+          {/* Render ungrouped categories */}
+          {groupedCategories.ungrouped.length > 0 && (
+            <View style={styles.groupSection}>
+              {renderGroupHeader('ungrouped', 'Ungrouped', groupedCategories.ungrouped)}
+              {expandedGroups.has('ungrouped') && (
+                <View style={styles.groupContent}>
+                  {renderCategoriesInGroup(groupedCategories.ungrouped)}
+                </View>
+              )}
+            </View>
+          )}
+        </ScrollView>
       )}
       <AddCategoryModal
         visible={modalVisible}
@@ -341,7 +483,16 @@ export default function Tab() {
         onNewCategory={() => {
           fetchAllocatedAndSpent();
         }}
-      />        
+      />
+      <AddCategoryGroupModal
+        visible={categoryGroupModalVisible}
+        onClose={() => setCategoryGroupModalVisible(false)}
+        userId={user?.uid}
+        onNewCategoryGroup={() => {
+          // Category groups are automatically updated via Firestore listener
+          // No manual refresh needed
+        }}
+      />
       <AssignmentModal
         visible={!!selectedCategory}
         onClose={() => setSelectedCategory(null)}
@@ -359,6 +510,10 @@ export default function Tab() {
         endDate={endDate}
         onCategoryNameUpdate={handleCategoryNameUpdate}
         onCategoryGoalUpdate={handleCategoryGoalUpdate}
+        onCategoryGroupUpdate={(categoryId, groupId) => {
+          // The category will be automatically updated via Firestore listener
+          console.log(`Category ${categoryId} moved to group ${groupId || 'No Group'}`);
+        }}
       />
       <ConfirmationModal
         visible={deleteConfirmVisible}
@@ -567,5 +722,54 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007BFF',
     fontWeight: '500',
+  },
+  // Group accordion styles
+  groupSection: {
+    marginBottom: 12,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#007BFF',
+    marginBottom: 4,
+  },
+  groupHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  groupTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginLeft: 8,
+  },
+  groupCount: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 6,
+  },
+  groupTotals: {
+    alignItems: 'flex-end',
+  },
+  groupTotalText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  groupContent: {
+    backgroundColor: '#FAFBFC',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  groupedCategoryItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#E9ECEF',
   },
 });

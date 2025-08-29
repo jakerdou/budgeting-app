@@ -16,6 +16,7 @@ interface BudgetTabHeaderProps {
   unallocatedFunds: Category | null;
   unallocatedIncome: number;
   onAddCategoryPress: () => void;
+  onAddCategoryGroupPress: () => void;
   incomeLoading?: boolean;
 }
 
@@ -32,6 +33,7 @@ const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
   unallocatedFunds,
   unallocatedIncome,
   onAddCategoryPress,
+  onAddCategoryGroupPress,
   incomeLoading = false,
 }) => {
   return (
@@ -50,12 +52,20 @@ const BudgetTabHeader: React.FC<BudgetTabHeaderProps> = ({
         />
       </View>
       <View style={styles.rightContainer}>
-        <TouchableOpacity 
-          style={styles.addButton} 
-          onPress={onAddCategoryPress}
-        >
-          <Text style={styles.addButtonText}>Add Category</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={styles.addButton} 
+            onPress={onAddCategoryPress}
+          >
+            <Text style={styles.addButtonText}>Add Category</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.addButton, styles.addGroupButton]} 
+            onPress={onAddCategoryGroupPress}
+          >
+            <Text style={styles.addButtonText}>Add Category Group</Text>
+          </TouchableOpacity>
+        </View>
         {unallocatedFunds && (
           <View style={styles.unallocatedContainer}>
             <Text style={styles.headerText}>{unallocatedFunds.name}</Text>
@@ -98,6 +108,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   unallocatedContainer: {
     flexDirection: 'column',
     alignItems: 'flex-end',
@@ -132,6 +146,9 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     alignItems: 'center',
+  },
+  addGroupButton: {
+    backgroundColor: '#28A745',
   },
   addButtonText: {
     color: '#fff',

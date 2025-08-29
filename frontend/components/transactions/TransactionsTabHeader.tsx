@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native
 import BankLinkButtonIOS from './BankLinkButtonIOS';
 import BankLinkButtonWeb from './BankLinkButtonWeb';
 import { Picker } from '@react-native-picker/picker';
+import { Ionicons } from '@expo/vector-icons';
 import { Category } from '@/types';
 
 interface TransactionsTabHeaderProps {
@@ -12,6 +13,7 @@ interface TransactionsTabHeaderProps {
   categories: Category[];
   selectedCategoryId: string | null;
   onCategoryFilterChange: (categoryId: string | null) => void;
+  hasUncategorizedTransactions?: boolean;
 }
 
 const TransactionsTabHeader: React.FC<TransactionsTabHeaderProps> = ({ 
@@ -20,8 +22,10 @@ const TransactionsTabHeader: React.FC<TransactionsTabHeaderProps> = ({
   isSyncing = false,
   categories,
   selectedCategoryId,
-  onCategoryFilterChange
-}) => {  // Determine which option is selected
+  onCategoryFilterChange,
+  hasUncategorizedTransactions = false
+}) => {
+  const [isHovered, setIsHovered] = React.useState(false);  // Determine which option is selected
   let selectedValue = "All";
   if (selectedCategoryId === "null") {
     selectedValue = "Uncategorized";
@@ -49,9 +53,29 @@ const TransactionsTabHeader: React.FC<TransactionsTabHeaderProps> = ({
   return (
     <View style={styles.header}>
       <View style={styles.titleContainer}>
-        <Text style={styles.title}>Transactions</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Transactions</Text>
+          {hasUncategorizedTransactions && (
+            <TouchableOpacity 
+              style={[
+                styles.uncategorizedMessage,
+                isHovered && styles.uncategorizedMessageHover
+              ]}
+              onPress={() => onCategoryFilterChange("null")}
+              {...(Platform.OS === 'web' ? {
+                onMouseEnter: () => setIsHovered(true),
+                onMouseLeave: () => setIsHovered(false),
+              } : {})}
+            >
+              <Ionicons name="alert-circle" size={14} color="#000" style={styles.alertIcon} />
+              <Text style={styles.uncategorizedMessageText}>
+                Some transactions need categories
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <View style={styles.filterContainer}>
-          <Text style={styles.filterText}>Filter by: </Text>          
+          <Text style={styles.filterText}>Filter by: </Text>
           <View style={styles.pickerContainer}>
             <Picker
               selectedValue={selectedValue}
@@ -107,6 +131,34 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  uncategorizedMessage: {
+    backgroundColor: '#fffbf0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#f0e68c',
+    flexDirection: 'row',
+    alignItems: 'center',
+    cursor: 'pointer',
+  },
+  uncategorizedMessageHover: {
+    backgroundColor: '#f5f0d6',
+    borderColor: '#e6d85c',
+  },
+  alertIcon: {
+    marginRight: 4,
+  },
+  uncategorizedMessageText: {
+    fontSize: 12,
+    color: '#000',
+    fontWeight: '500',
   },  filterContainer: {
     flexDirection: 'row',
     alignItems: 'center',

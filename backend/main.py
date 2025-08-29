@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.user_routes import router as user_router
 from api.category_routes import router as category_router
+from api.category_group_routes import router as category_group_router
 from api.transaction_routes import router as transaction_router
 from api.assignment_routes import router as assignment_router
 from api.account_routes import router as account_router
@@ -28,6 +29,7 @@ app.add_middleware(
 # Include routers
 app.include_router(user_router, prefix="/user")
 app.include_router(category_router, prefix="/category")
+app.include_router(category_group_router, prefix="/category")
 app.include_router(transaction_router, prefix="/transaction")
 app.include_router(assignment_router, prefix="/assignment")
 app.include_router(account_router, prefix="/account")
