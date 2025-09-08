@@ -32,6 +32,7 @@ export default function InsightsScreen() {
     loading: allocatedSpentLoading,
     fetchAllocatedAndSpent,
     getSpentAmount,
+    getAllocatedAmount,
   } = useAllocatedAndSpent(user, startDate, endDate);
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [selectedInfoCategory, setSelectedInfoCategory] = useState<any>(null);
@@ -46,6 +47,7 @@ export default function InsightsScreen() {
   });
 
   const totalSpent = Object.values(allocatedAndSpent).reduce((sum, item) => sum + item.spent, 0);
+  const totalAllocated = Object.values(allocatedAndSpent).reduce((sum, item) => sum + item.allocated, 0);
 
   // Get spending by category with category names
   const spendingByCategory = categories
@@ -58,6 +60,20 @@ export default function InsightsScreen() {
     }))
     // .filter(item => item.spent > 0)
     .sort((a, b) => b.spent - a.spent);
+
+  // Get allocation vs spending by category
+  const allocationVsSpendingByCategory = categories
+    .filter(category => !category.is_unallocated_funds) // Exclude unallocated funds
+    .map(category => ({
+      id: category.id,
+      name: category.name,
+      allocated: getAllocatedAmount(category.id),
+      spent: getSpentAmount(category.id),
+      remaining: getAllocatedAmount(category.id) - getSpentAmount(category.id),
+      percentageUsed: getAllocatedAmount(category.id) > 0 ? (getSpentAmount(category.id) / getAllocatedAmount(category.id)) * 100 : 0
+    }))
+    .filter(item => item.allocated > 0) // Only show categories with allocations
+    .sort((a, b) => b.allocated - a.allocated);
 
   // Prepare chart data - limit to top 8 categories for readability
   const chartData = spendingByCategory.slice(0, 8);
@@ -145,6 +161,11 @@ export default function InsightsScreen() {
                 <Text style={styles.spendingAmount}>${totalSpent.toFixed(2)}</Text>
                 <Text style={styles.summarySubtitle}>All Categories</Text>
               </View>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryTitle}>Total Allocations</Text>
+                <Text style={styles.allocatedAmount}>${totalAllocated.toFixed(2)}</Text>
+                <Text style={styles.summarySubtitle}>All Categories</Text>
+              </View>
             </View>
 
             {/* Net Cash Flow */}
@@ -156,7 +177,20 @@ export default function InsightsScreen() {
               ]}>
                 {unallocatedIncome - totalSpent >= 0 ? '+' : ''}${(unallocatedIncome - totalSpent).toFixed(2)}
               </Text>
+              <Text style={styles.summarySubtitle}>Income - Spending</Text>
             </View>
+
+            {/* Allocation vs Spending */}
+            {/* <View style={[styles.totalCard, { backgroundColor: totalAllocated - totalSpent >= 0 ? '#e8f5e8' : '#ffeaea' }]}>
+              <Text style={styles.totalTitle}>Allocation Balance</Text>
+              <Text style={[
+                styles.totalAmount, 
+                { color: totalAllocated - totalSpent >= 0 ? '#2e7d32' : '#d32f2f' }
+              ]}>
+                {totalAllocated - totalSpent >= 0 ? '+' : ''}${(totalAllocated - totalSpent).toFixed(2)}
+              </Text>
+              <Text style={styles.summarySubtitle}>Allocated - Spent</Text>
+            </View> */}
 
             {/* Charts Section - Bar Chart and Pie Chart Side by Side */}
             {chartData.length > 0 && (
@@ -303,7 +337,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 20,
-    gap: 12,
+    gap: 8,
   },
   summaryCard: {
     flex: 1,
@@ -324,6 +358,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#2e7d32',
+    marginBottom: 4,
+  },
+  allocatedAmount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1976d2',
     marginBottom: 4,
   },
   spendingAmount: {
@@ -403,17 +443,42 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#007AFF',
   },
+  allocationAmounts: {
+    alignItems: 'flex-end',
+  },
+  allocatedText: {
+    fontSize: 12,
+    color: '#1976d2',
+    fontWeight: '600',
+  },
+  spentText: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '600',
+  },
+  remainingText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   progressBar: {
     height: 8,
     backgroundColor: '#e9ecef',
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 4,
+    position: 'relative',
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#007AFF',
     borderRadius: 4,
+  },
+  overBudgetFill: {
+    height: '100%',
+    backgroundColor: '#d32f2f',
+    borderRadius: 4,
+    position: 'absolute',
+    left: '100%',
   },
   percentage: {
     fontSize: 12,

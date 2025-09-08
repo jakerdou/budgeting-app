@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, TextInput, Alert } from 'react-native';
+import Modal from 'react-native-modal';
 import { Category } from '@/types';
 import CategoryGoalTab from './CategoryGoalTab';
 import CategoryTransactionsTab from './CategoryTransactionsTab';
@@ -21,7 +22,7 @@ interface CategoryInfoModalProps {
 const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category, onClose, startDate, endDate, onCategoryNameUpdate, onCategoryGoalUpdate, onCategoryGroupUpdate }) => {
   const { user } = useAuth();
   const { categoryGroups } = useCategories();
-  const [activeTab, setActiveTab] = useState('goals');
+  const [activeTab, setActiveTab] = useState('info');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
@@ -97,13 +98,15 @@ const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category
   
   return (
     <Modal
-      visible={visible}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={onClose}
+      isVisible={visible}
+      onBackdropPress={onClose}
+      onBackButtonPress={onClose}
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      backdropOpacity={0.5}
+      style={styles.modalContainer}
     >
-      <View style={styles.centeredView}>
-        <View style={styles.modalView}>
+      <View style={styles.modalView}>
           <View style={styles.header}>
             <View style={styles.titleContainer}>
               {isEditingName ? (
@@ -132,62 +135,14 @@ const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category
                 </View>
               )}
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>×</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {/* Category Group Dropdown */}
-          <View style={styles.groupSection}>
-            <Text style={styles.groupLabel}>Category Group:</Text>
-            <View style={styles.groupDropdownContainer}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupOptions}>
-                <TouchableOpacity
-                  style={[
-                    styles.groupOption,
-                    !currentGroupId && styles.selectedGroupOption
-                  ]}
-                  onPress={() => handleGroupChange(null)}
-                  disabled={isSavingGroup}
-                >
-                  <Text style={[
-                    styles.groupOptionText,
-                    !currentGroupId && styles.selectedGroupOptionText
-                  ]}>
-                    No Group
-                  </Text>
-                </TouchableOpacity>
-                {categoryGroups.map((group) => (
-                  <TouchableOpacity
-                    key={group.id}
-                    style={[
-                      styles.groupOption,
-                      currentGroupId === group.id && styles.selectedGroupOption
-                    ]}
-                    onPress={() => handleGroupChange(group.id)}
-                    disabled={isSavingGroup}
-                  >
-                    <Text style={[
-                      styles.groupOptionText,
-                      currentGroupId === group.id && styles.selectedGroupOptionText
-                    ]}>
-                      {group.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              {isSavingGroup && (
-                <Text style={styles.savingText}>Updating...</Text>
-              )}
-            </View>
           </View>
           
           <View style={styles.tabContainer}>
             <TouchableOpacity 
-              style={[styles.tab, activeTab === 'goals' && styles.activeTab]} 
-              onPress={() => setActiveTab('goals')}
+              style={[styles.tab, activeTab === 'info' && styles.activeTab]} 
+              onPress={() => setActiveTab('info')}
             >
-              <Text style={[styles.tabText, activeTab === 'goals' && styles.activeTabText]}>Goals</Text>
+              <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>Info</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.tab, activeTab === 'transactions' && styles.activeTab]}
@@ -197,11 +152,59 @@ const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category
             </TouchableOpacity>
           </View>
             <View style={styles.content}>
-            {activeTab === 'goals' ? (
-              <CategoryGoalTab 
-                category={category} 
-                onGoalUpdate={onCategoryGoalUpdate}
-              />
+            {activeTab === 'info' ? (
+              <ScrollView style={styles.infoTabContent}>
+                {/* Category Group Dropdown */}
+                <View style={styles.groupSection}>
+                  <Text style={styles.groupLabel}>Category Group:</Text>
+                  <View style={styles.groupDropdownContainer}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupOptions}>
+                      <TouchableOpacity
+                        style={[
+                          styles.groupOption,
+                          !currentGroupId && styles.selectedGroupOption
+                        ]}
+                        onPress={() => handleGroupChange(null)}
+                        disabled={isSavingGroup}
+                      >
+                        <Text style={[
+                          styles.groupOptionText,
+                          !currentGroupId && styles.selectedGroupOptionText
+                        ]}>
+                          No Group
+                        </Text>
+                      </TouchableOpacity>
+                      {categoryGroups.map((group) => (
+                        <TouchableOpacity
+                          key={group.id}
+                          style={[
+                            styles.groupOption,
+                            currentGroupId === group.id && styles.selectedGroupOption
+                          ]}
+                          onPress={() => handleGroupChange(group.id)}
+                          disabled={isSavingGroup}
+                        >
+                          <Text style={[
+                            styles.groupOptionText,
+                            currentGroupId === group.id && styles.selectedGroupOptionText
+                          ]}>
+                            {group.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                    {isSavingGroup && (
+                      <Text style={styles.savingText}>Updating...</Text>
+                    )}
+                  </View>
+                </View>
+                
+                {/* Goals Section */}
+                <CategoryGoalTab 
+                  category={category} 
+                  onGoalUpdate={onCategoryGoalUpdate}
+                />
+              </ScrollView>
             ) : (
               <CategoryTransactionsTab 
                 category={category} 
@@ -211,48 +214,32 @@ const CategoryInfoModal: React.FC<CategoryInfoModalProps> = ({ visible, category
               />
             )}
           </View>
-          
-          <TouchableOpacity 
-            style={styles.button} 
-            onPress={onClose}
-          >
-            <Text style={styles.buttonText}>Close</Text>
-          </TouchableOpacity>
-          
-          {/* <TouchableOpacity 
-            style={styles.button} 
-            onPress={onClose}
-          >
-            <Text style={styles.buttonText}>Close</Text>
-          </TouchableOpacity> */}
         </View>
-      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  centeredView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  modalContainer: {
+    margin: 0, // Take up full screen
+    justifyContent: 'flex-end', // Align to the bottom
   },
   modalView: {
-    width: '90%',
-    maxWidth: 500,
-    maxHeight: '80%',
+    width: '100%',
+    height: '90%',
     backgroundColor: 'white',
-    borderRadius: 10,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 20,
+    paddingHorizontal: 30, // Added horizontal padding
     alignItems: 'stretch',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: -2,
     },
     shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowRadius: 4,
     elevation: 5,
   },
   header: {
@@ -267,14 +254,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 5,
-  },
-  closeButtonText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#666',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -302,6 +281,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     marginBottom: 20,
+  },
+  infoTabContent: {
+    flex: 1,
   },
   section: {
     marginBottom: 15,
@@ -382,14 +364,14 @@ const styles = StyleSheet.create({
   },
   groupSection: {
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   groupLabel: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 8,
     color: '#333',
   },
   groupDropdownContainer: {

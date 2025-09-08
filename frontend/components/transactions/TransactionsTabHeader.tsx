@@ -55,7 +55,7 @@ const TransactionsTabHeader: React.FC<TransactionsTabHeaderProps> = ({
       <View style={styles.titleContainer}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>Transactions</Text>
-          {hasUncategorizedTransactions && (
+          {/* {hasUncategorizedTransactions && (
             <TouchableOpacity 
               style={[
                 styles.uncategorizedMessage,
@@ -72,7 +72,7 @@ const TransactionsTabHeader: React.FC<TransactionsTabHeaderProps> = ({
                 Some transactions need categories
               </Text>
             </TouchableOpacity>
-          )}
+          )} */}
         </View>
         <View style={styles.filterContainer}>
           <Text style={styles.filterText}>Filter by: </Text>

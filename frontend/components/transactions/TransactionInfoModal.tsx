@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { Transaction, Category } from '@/types';
@@ -79,12 +80,15 @@ export default function TransactionInfoModal({
 
   return (
     <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      isVisible={visible}
+      onBackdropPress={onClose}
+      onBackButtonPress={onClose}
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      backdropOpacity={0.5}
+      style={styles.modalContainer}
     >
-      <View style={styles.container}>
+      <View style={styles.modalView}>
         <View style={styles.header}>
           <Text style={styles.title}>Transaction Details</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -191,26 +195,35 @@ export default function TransactionInfoModal({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
+  modalContainer: {
+    margin: 0, // Take up full screen
+    justifyContent: 'flex-end', // Align to the bottom
+  },
+  modalView: {
+    width: '100%',
+    height: '90%',
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 30, // Added horizontal padding
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 0, // Remove extra padding since modalView has horizontal padding
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    ...Platform.select({
-      web: {
-        paddingTop: 20,
-      },
-      default: {
-        paddingTop: 60, // Account for status bar on mobile
-      },
-    }),
+    marginTop: 10,
   },
   title: {
     fontSize: 20,
@@ -222,7 +235,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 0, // Remove horizontal padding since modalView has it
   },
   section: {
     marginVertical: 16,

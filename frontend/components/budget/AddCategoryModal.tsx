@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Platform, TouchableOpacity } from 'react-native';
 import Modal from 'react-native-modal'; // Importing react-native-modal
 import { addCategory } from '@/services/categories';
 
@@ -30,11 +30,11 @@ const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onClose, u
   }, [visible]);
 
   const handleAddCategory = async () => {
-    if (userId) {
-      const data = await addCategory(userId, newCategoryName);
+    if (userId && newCategoryName.trim()) {
+      const data = await addCategory(userId, newCategoryName.trim());
       const newCategory = {
         id: data.category_id,
-        name: newCategoryName,
+        name: newCategoryName.trim(),
         allocated: 0,
         available: 0,
       };
@@ -42,6 +42,8 @@ const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onClose, u
       onClose(); // Input will be cleared by useEffect when modal closes
     }
   };
+
+  const isAddDisabled = !newCategoryName.trim();
 
   return (
     <Modal
@@ -63,8 +65,18 @@ const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onClose, u
           onChangeText={setNewCategoryName}
           autoFocus={Platform.OS === 'web'} // For web, use autoFocus
         />
-        <Button title="Add" onPress={handleAddCategory} />
-        <Button title="Cancel" onPress={onClose} />
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
+            <Text style={styles.buttonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.button, isAddDisabled ? styles.disabledButton : styles.addButton]} 
+            onPress={handleAddCategory}
+            disabled={isAddDisabled}
+          >
+            <Text style={[styles.buttonText, isAddDisabled && styles.disabledButtonText]}>Add</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );
@@ -80,6 +92,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    paddingHorizontal: 30, // Added horizontal padding
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
@@ -89,7 +102,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    height: '75%', // Adjust this to take up the desired height
+    height: '90%', // Adjust this to take up the desired height
   },
   modalText: {
     fontSize: 18,
@@ -103,6 +116,35 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 5,
     marginBottom: 15,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 10,
+  },
+  button: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  addButton: {
+    backgroundColor: '#007BFF',
+  },
+  cancelButton: {
+    backgroundColor: '#6c757d',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  disabledButtonText: {
+    color: '#999',
   },
 });
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Platform, TouchableOpacity } from 'react-native';
 import Modal from 'react-native-modal';
 import { createCategoryGroup } from '@/services/category_groups';
 
@@ -49,42 +49,38 @@ const AddCategoryGroupModal: React.FC<AddCategoryGroupModalProps> = ({ visible, 
       isVisible={visible}
       onBackdropPress={onClose}
       onBackButtonPress={onClose}
-      style={styles.modal}
       animationIn="slideInUp"
       animationOut="slideOutDown"
       backdropOpacity={0.5}
-      useNativeDriver={true}
+      style={styles.modalContainer}
     >
-      <View style={styles.modalContent}>
-        <Text style={styles.modalTitle}>Add Category Group</Text>
+      <View style={styles.modalView}>
+        <Text style={styles.modalText}>Add Category Group</Text>
         
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Group Name:</Text>
-          <TextInput
-            ref={nameInputRef}
-            style={styles.input}
-            placeholder="Enter group name"
-            value={newGroupName}
-            onChangeText={setNewGroupName}
-            autoCapitalize="words"
-            returnKeyType="done"
-            onSubmitEditing={handleAddCategoryGroup}
-            maxLength={50}
-          />
-        </View>
+        <TextInput
+          ref={nameInputRef}
+          style={styles.input}
+          placeholder="Enter group name"
+          value={newGroupName}
+          onChangeText={setNewGroupName}
+          autoCapitalize="words"
+          returnKeyType="done"
+          onSubmitEditing={handleAddCategoryGroup}
+          maxLength={50}
+          autoFocus={Platform.OS === 'web'} // For web, use autoFocus
+        />
 
         <View style={styles.buttonContainer}>
-          <Button
-            title="Cancel"
-            onPress={onClose}
-            color="#6c757d"
-          />
-          <Button
-            title="Add Group"
+          <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
+            <Text style={styles.buttonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.button, isAddDisabled ? styles.disabledButton : styles.addButton]} 
             onPress={handleAddCategoryGroup}
             disabled={isAddDisabled}
-            color={isAddDisabled ? "#6c757d" : "#007BFF"}
-          />
+          >
+            <Text style={[styles.buttonText, isAddDisabled && styles.disabledButtonText]}>Add Group</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -92,49 +88,68 @@ const AddCategoryGroupModal: React.FC<AddCategoryGroupModalProps> = ({ visible, 
 };
 
 const styles = StyleSheet.create({
-  modal: {
-    justifyContent: 'center',
-    margin: 20,
+  modalContainer: {
+    margin: 0, // Take up full screen
+    justifyContent: 'flex-end', // Align to the bottom
   },
-  modalContent: {
+  modalView: {
     backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 20,
-    borderRadius: 10,
-    minHeight: 200,
+    paddingHorizontal: 30, // Added horizontal padding
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    height: '90%', // Adjust this to take up the desired height
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
+  modalText: {
+    fontSize: 18,
+    marginBottom: 15,
     textAlign: 'center',
-    color: '#333',
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
   },
   input: {
+    width: '100%',
+    padding: 10,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
-    ...Platform.select({
-      web: {
-        outlineStyle: 'none',
-      },
-    }),
+    borderRadius: 5,
+    marginBottom: 15,
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 20,
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 10,
+  },
+  button: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  addButton: {
+    backgroundColor: '#007BFF',
+  },
+  cancelButton: {
+    backgroundColor: '#6c757d',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  disabledButtonText: {
+    color: '#999',
   },
 });
 

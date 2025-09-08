@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Button, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import Modal from 'react-native-modal'; // Importing react-native-modal
 import { createAssignment } from '@/services/assignments'; // Importing the createAssignment function from the API
 import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
@@ -20,11 +20,17 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ visible, onClose, cat
   useEffect(() => {
     if (visible) {
       setAmount('');
-      inputRef.current?.focus();
+      // Add a small delay to ensure the modal animation completes before focusing
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 300);
+      
+      return () => clearTimeout(timer);
     }
   }, [visible]);
+  
   const handleSubmit = async () => {
-    if (!category) return;
+    if (!category || !amount.trim()) return;
 
     const assignment = {
       amount: parseFloat(amount),
@@ -44,6 +50,8 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ visible, onClose, cat
       console.error('Error creating assignment', error);
     }
   };
+
+  const isSubmitDisabled = !amount.trim();
 
   if (!category) return null;
 
@@ -66,9 +74,20 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ visible, onClose, cat
           keyboardType="numeric"
           value={amount}
           onChangeText={setAmount}
+          autoFocus={Platform.OS === 'web'} // For web, use autoFocus
         />
-        <Button title="Submit" onPress={handleSubmit} />
-        <Button title="Close" onPress={onClose} />
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={[styles.button, styles.closeButton]} onPress={onClose}>
+            <Text style={styles.buttonText}>Close</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.button, isSubmitDisabled ? styles.disabledButton : styles.submitButton]} 
+            onPress={handleSubmit}
+            disabled={isSubmitDisabled}
+          >
+            <Text style={[styles.buttonText, isSubmitDisabled && styles.disabledButtonText]}>Submit</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );
@@ -84,6 +103,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    paddingHorizontal: 30, // Added horizontal padding
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
@@ -93,7 +113,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    height: '75%', // Adjust this to take up the desired height
+    height: '90%', // Adjust this to take up the desired height
   },
   modalText: {
     fontSize: 18,
@@ -107,6 +127,35 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 5,
     marginBottom: 15,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 10,
+  },
+  button: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  submitButton: {
+    backgroundColor: '#007BFF',
+  },
+  closeButton: {
+    backgroundColor: '#6c757d',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  disabledButtonText: {
+    color: '#999',
   },
 });
 
