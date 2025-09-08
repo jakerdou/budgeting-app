@@ -1,9 +1,9 @@
 // app/context/AuthProvider.tsx
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { auth } from '../firebaseConfig.env';
 import { doc, getDoc } from 'firebase/firestore'; // Assuming Firestore is used
-import { db } from '../firebaseConfig'; // Import your Firestore instance
+import { db } from '../firebaseConfig.env'; 
 
 type AuthContextType = {
   user: { email: string; uid: string; preferences?: any } | null;

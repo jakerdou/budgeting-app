@@ -8,7 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build": "expo export --platform web && copy 404.html dist\\404.html",
+    "build": "expo export --platform web",
     "test": "jest --watchAll",
     "lint": "expo lint"
   },
