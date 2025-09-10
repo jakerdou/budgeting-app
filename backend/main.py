@@ -14,6 +14,7 @@ from api.assignment_routes import router as assignment_router
 from api.account_routes import router as account_router
 from api.plaid_routes import router as plaid_router
 from api.plaid_item_routes import router as plaid_item_router
+from api.health_routes import router as health_router
 
 app = FastAPI()
 
@@ -27,6 +28,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(health_router, prefix="/health")
 app.include_router(user_router, prefix="/user")
 app.include_router(category_router, prefix="/category")
 app.include_router(category_group_router, prefix="/category")
