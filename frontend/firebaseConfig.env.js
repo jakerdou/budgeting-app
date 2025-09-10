@@ -13,7 +13,24 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
+// Debug Firebase config
+console.log('Firebase Config:', {
+  apiKey: firebaseConfig.apiKey ? 'Set' : 'Missing',
+  authDomain: firebaseConfig.authDomain ? 'Set' : 'Missing',
+  projectId: firebaseConfig.projectId ? 'Set' : 'Missing',
+  // Don't log the actual values for security
+});
+
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+let app, auth, db;
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  console.log('Firebase initialized successfully');
+} catch (error) {
+  console.error('Firebase initialization failed:', error);
+  throw error;
+}
+
+export { auth, db };

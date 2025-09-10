@@ -1,8 +1,17 @@
 // app/context/AuthProvider.tsx
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { auth, db } from '../firebaseConfig.env.js';
-import { doc, getDoc } from 'firebase/firestore'; // Assuming Firestore is used 
+import { doc, getDoc } from 'firebase/firestore';
+
+// Import Firebase config - handle potential initialization errors
+let auth: any, db: any;
+try {
+  const firebaseConfig = require('../firebaseConfig.env.js');
+  auth = firebaseConfig.auth;
+  db = firebaseConfig.db;
+} catch (error) {
+  console.error('Failed to import Firebase configuration:', error);
+} 
 
 type AuthContextType = {
   user: { email: string; uid: string; preferences?: any } | null;
@@ -19,29 +28,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<{ email: string; uid: string; preferences?: any } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Fetch preferences
-        try {
-          const userRef = doc(db, 'users', firebaseUser.uid); // Fetch document by UID
-          const userSnap = await getDoc(userRef);
-          let preferences = userSnap.exists() ? userSnap.data().preferences : {};
+  console.log('AuthProvider initialized, loading:', loading);
 
-          setUser({
-            email: firebaseUser.email!,
-            uid: firebaseUser.uid,
-            preferences, // Add preferences to user object
-          });
-        } catch (error) {
-          console.error('Failed to fetch user preferences:', error);
-        }
-      } else {
-        setUser(null);
-      }
+  useEffect(() => {
+    console.log('Setting up Firebase auth listener...');
+    
+    // Set a timeout to ensure loading doesn't get stuck forever
+    const timeoutId = setTimeout(() => {
+      console.warn('Auth initialization timeout - setting loading to false');
       setLoading(false);
+    }, 10000); // 10 second timeout
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser ? 'User logged in' : 'User logged out');
+      clearTimeout(timeoutId); // Clear timeout since auth state changed
+      
+      try {
+        if (firebaseUser) {
+          // Fetch preferences
+          try {
+            const userRef = doc(db, 'users', firebaseUser.uid); // Fetch document by UID
+            const userSnap = await getDoc(userRef);
+            let preferences = userSnap.exists() ? userSnap.data().preferences : {};
+
+            setUser({
+              email: firebaseUser.email!,
+              uid: firebaseUser.uid,
+              preferences, // Add preferences to user object
+            });
+          } catch (error) {
+            console.error('Failed to fetch user preferences:', error);
+            // Still set user even if preferences fetch fails
+            setUser({
+              email: firebaseUser.email!,
+              uid: firebaseUser.uid,
+              preferences: {},
+            });
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Auth state change error:', error);
+        setUser(null);
+      } finally {
+        // Always set loading to false, regardless of success or failure
+        console.log('Setting loading to false');
+        setLoading(false);
+      }
     });
-    return () => unsubscribe();
+    
+    return () => {
+      unsubscribe();
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   const updateUserPreferences = (newPreferences: any) => {
