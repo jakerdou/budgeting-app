@@ -25,6 +25,28 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+def convert_plaid_personal_finance_category(pfc):
+    """Convert Plaid PersonalFinanceCategory object to a dictionary for Firestore storage"""
+    if not pfc:
+        return None
+    
+    if hasattr(pfc, 'to_dict'):
+        return pfc.to_dict()
+    elif hasattr(pfc, '__dict__'):
+        return pfc.__dict__
+    elif isinstance(pfc, dict):
+        return pfc
+    else:
+        # Fallback - try to extract common fields manually
+        try:
+            return {
+                'confidence_level': getattr(pfc, 'confidence_level', None),
+                'detailed': getattr(pfc, 'detailed', None),
+                'primary': getattr(pfc, 'primary', None)
+            }
+        except:
+            return None
+
 class User(BaseModel):
     email: str
     user_id: str
@@ -523,6 +545,9 @@ async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):
                         "plaid_transaction_id": transaction["transaction_id"],
                         "institution_name": item_data["institution_name"],
                         "account_name": account_name,
+                        "merchant_name": transaction.get("merchant_name"),
+                        "personal_finance_category": convert_plaid_personal_finance_category(transaction.get("personal_finance_category")),
+                        "pending": transaction.get("pending"),
                         "category_id": NULL_VALUE,  # Use the explicit NULL_VALUE constant
                         "created_at": datetime.now(timezone.utc),
                         "type": "debit" if -transaction["amount"] < 0 else "credit"
@@ -542,123 +567,188 @@ async def sync_plaid_transactions(request: SyncPlaidTransactionsRequest):
                 continue
         
         print(f"Completed transaction creation: {successful_batches}/{total_batches} batches successful")
+        
+        # Check if all batches were successful before proceeding
+        if successful_batches < total_batches:
+            print(f"❌ Not all batches were successful ({successful_batches}/{total_batches}). Skipping cursor updates to allow retry.")
+            raise HTTPException(status_code=500, detail=f"Failed to process all transaction batches. Only {successful_batches}/{total_batches} batches were successful.")
 
         # Process modified transactions
         print(f"Processing {len(modified_transactions)} modified transactions")
+        modified_successful = 0
         for transaction in modified_transactions:
-            # Get the correct item_data for this transaction
-            item_data = transaction_item_map.get(transaction["transaction_id"])
-            if not item_data:
-                print(f"Warning: No item data found for modified transaction {transaction['transaction_id']}")
-                continue
-                
-            print(f"Modifying transaction: {transaction['transaction_id']}")
+            try:
+                # Get the correct item_data for this transaction
+                item_data = transaction_item_map.get(transaction["transaction_id"])
+                if not item_data:
+                    print(f"Warning: No item data found for modified transaction {transaction['transaction_id']}")
+                    continue
+                    
+                print(f"Modifying transaction: {transaction['transaction_id']}")
 
-            account_name = next(
-                (account["name"] for account in item_data.get("accounts", []) if account["account_id"] == transaction["account_id"]),
-                None
-            )
-            existing_query = db.collection("transactions").where("plaid_transaction_id", "==", transaction["transaction_id"]).where("user_id", "==", user_id)
-            existing_docs = existing_query.stream()
-            existing_doc = next(existing_docs, None)
-
-            if existing_doc:
-                print(f"Updating existing transaction with ID: {existing_doc.id}")
-                existing_doc.reference.update({
-                    "amount": -transaction["amount"] if transaction["amount"] > 0 else transaction["amount"],
-                    "name": transaction["name"],
-                    "date": transaction['date'].strftime("%Y-%m-%d")
-                })
-            else:
-                print(f"Creating new transaction for modified transaction: {transaction['transaction_id']}")
-                  # Create a validated transaction using our schema
-                transaction_schema = TransactionSchema(
-                    amount=-transaction["amount"],
-                    name=transaction["name"],
-                    date=transaction['date'].strftime("%Y-%m-%d"),
-                    user_id=user_id,
-                    plaid_transaction_id=transaction["transaction_id"],
-                    institution_name=item_data["institution_name"],
-                    account_name=account_name,
-                    category_id=None  # Explicitly set category_id to None for modified transactions
+                account_name = next(
+                    (account["name"] for account in item_data.get("accounts", []) if account["account_id"] == transaction["account_id"]),
+                    None
                 )
+                existing_query = db.collection("transactions").where("plaid_transaction_id", "==", transaction["transaction_id"]).where("user_id", "==", user_id)
+                existing_docs = existing_query.stream()
+                existing_doc = next(existing_docs, None)
+
+                if existing_doc:
+                    print(f"Updating existing transaction with ID: {existing_doc.id}")
+                    existing_doc.reference.update({
+                        "amount": -transaction["amount"] if transaction["amount"] > 0 else transaction["amount"],
+                        "name": transaction["name"],
+                        "date": transaction['date'].strftime("%Y-%m-%d"),
+                        "merchant_name": transaction.get("merchant_name"),
+                        "personal_finance_category": convert_plaid_personal_finance_category(transaction.get("personal_finance_category")),
+                        "pending": transaction.get("pending")
+                    })
+                else:
+                    print(f"Creating new transaction for modified transaction: {transaction['transaction_id']}")
+                    # Create a validated transaction using our schema
+                    transaction_schema = TransactionSchema(
+                        amount=-transaction["amount"],
+                        name=transaction["name"],
+                        date=transaction['date'].strftime("%Y-%m-%d"),
+                        user_id=user_id,
+                        plaid_transaction_id=transaction["transaction_id"],
+                        institution_name=item_data["institution_name"],
+                        account_name=account_name,
+                        merchant_name=transaction.get("merchant_name"),
+                        personal_finance_category=convert_plaid_personal_finance_category(transaction.get("personal_finance_category")),
+                        pending=transaction.get("pending"),
+                        category_id=None  # Explicitly set category_id to None for modified transactions
+                    )
+                    
+                    # Create explicit transaction data dictionary
+                    transaction_dict = {
+                        "amount": -transaction["amount"],
+                        "name": transaction["name"],
+                        "date": transaction['date'].strftime("%Y-%m-%d"),
+                        "user_id": user_id,
+                        "plaid_transaction_id": transaction["transaction_id"],
+                        "institution_name": item_data["institution_name"],
+                        "account_name": account_name,
+                        "merchant_name": transaction.get("merchant_name"),
+                        "personal_finance_category": convert_plaid_personal_finance_category(transaction.get("personal_finance_category")),
+                        "pending": transaction.get("pending"),
+                        "category_id": NULL_VALUE,  # Use the explicit NULL_VALUE constant
+                        "created_at": datetime.now(timezone.utc),
+                        "type": "debit" if -transaction["amount"] < 0 else "credit"
+                    }
+                    
+                    print(f"Debug modified transaction with NULL_VALUE: {transaction_dict}")
+                    
+                    transaction_ref = db.collection("transactions").document()
+                    # Use merge=False to ensure fields are set exactly as provided
+                    transaction_ref.set(transaction_dict, merge=False)
                 
-                # Create explicit transaction data dictionary
-                transaction_dict = {
-                    "amount": -transaction["amount"],
-                    "name": transaction["name"],
-                    "date": transaction['date'].strftime("%Y-%m-%d"),
-                    "user_id": user_id,
-                    "plaid_transaction_id": transaction["transaction_id"],
-                    "institution_name": item_data["institution_name"],
-                    "account_name": account_name,
-                    "category_id": NULL_VALUE,  # Use the explicit NULL_VALUE constant
-                    "created_at": datetime.now(timezone.utc),
-                    "type": "debit" if -transaction["amount"] < 0 else "credit"
-                }
+                modified_successful += 1
+                print(f"✅ Successfully processed modified transaction {transaction['transaction_id']}")
                 
-                print(f"Debug modified transaction with NULL_VALUE: {transaction_dict}")
-                
-                transaction_ref = db.collection("transactions").document()
-                # Use merge=False to ensure fields are set exactly as provided
-                transaction_ref.set(transaction_dict, merge=False)
+            except Exception as e:
+                print(f"❌ Failed to process modified transaction {transaction['transaction_id']}: {e}")
+                continue
+        
+        print(f"Completed modified transactions: {modified_successful}/{len(modified_transactions)} successful")
+        
+        # Check if all modified transactions were successful
+        if modified_successful < len(modified_transactions):
+            print(f"❌ Not all modified transactions were successful ({modified_successful}/{len(modified_transactions)}). Skipping cursor updates to allow retry.")
+            raise HTTPException(status_code=500, detail=f"Failed to process all modified transactions. Only {modified_successful}/{len(modified_transactions)} were successful.")
 
         # Process deleted transactions
         print(f"Processing {len(deleted_transactions)} deleted transactions")
+        deleted_successful = 0
         for transaction in deleted_transactions:
-            print(f"Deleting transaction: {transaction['transaction_id']}")
-            existing_query = db.collection("transactions").where("plaid_transaction_id", "==", transaction["transaction_id"]).where("user_id", "==", user_id)
-            existing_docs = existing_query.stream()
+            try:
+                print(f"Deleting transaction: {transaction['transaction_id']}")
+                existing_query = db.collection("transactions").where("plaid_transaction_id", "==", transaction["transaction_id"]).where("user_id", "==", user_id)
+                existing_docs = existing_query.stream()
 
-            for doc in existing_docs:
-                print(f"Deleting transaction with ID: {doc.id}")
-                
-                # Get transaction data before deleting to check for category
-                transaction_data = doc.to_dict()
-                category_id = transaction_data.get("category_id")
-                new_available = None
-                
-                if category_id:
-                    category_ref = db.collection("categories").document(category_id)
-                    category_doc = category_ref.get()
+                transaction_found = False
+                for doc in existing_docs:
+                    transaction_found = True
+                    print(f"Deleting transaction with ID: {doc.id}")
                     
-                    if category_doc.exists:
-                        # Calculate new available amount for the category
-                        category_data = category_doc.to_dict()
-                        transaction_amount = Decimal(str(transaction_data["amount"]))
-                        current_available = Decimal(str(category_data.get("available", 0.0)))
-                        new_available = current_available - transaction_amount
-                        print(f"Updating category {category_id} available amount from {current_available} to {new_available}")
+                    # Get transaction data before deleting to check for category
+                    transaction_data = doc.to_dict()
+                    category_id = transaction_data.get("category_id")
+                    new_available = None
+                    
+                    if category_id:
+                        category_ref = db.collection("categories").document(category_id)
+                        category_doc = category_ref.get()
+                        
+                        if category_doc.exists:
+                            # Calculate new available amount for the category
+                            category_data = category_doc.to_dict()
+                            transaction_amount = Decimal(str(transaction_data["amount"]))
+                            current_available = Decimal(str(category_data.get("available", 0.0)))
+                            new_available = current_available - transaction_amount
+                            print(f"Updating category {category_id} available amount from {current_available} to {new_available}")
+                        else:
+                            print(f"Warning: Category {category_id} not found for transaction {doc.id}")
                     else:
-                        print(f"Warning: Category {category_id} not found for transaction {doc.id}")
-                else:
-                    print(f"Transaction {doc.id} has no category - skipping category update")
+                        print(f"Transaction {doc.id} has no category - skipping category update")
 
-                # Use batch write for atomicity
-                batch = db.batch()
+                    # Use batch write for atomicity
+                    batch = db.batch()
+                    
+                    # 1. Delete the transaction
+                    batch.delete(doc.reference)
+                    
+                    # 2. Update category available amount if transaction had a category
+                    if category_id and new_available is not None and category_doc.exists:
+                        batch.update(category_ref, {"available": float(new_available)})
+                    
+                    # Execute all writes atomically
+                    batch.commit()
                 
-                # 1. Delete the transaction
-                batch.delete(doc.reference)
+                if transaction_found:
+                    deleted_successful += 1
+                    print(f"✅ Successfully processed deleted transaction {transaction['transaction_id']}")
+                else:
+                    print(f"⚠️ Transaction {transaction['transaction_id']} not found in database (may have been already deleted)")
+                    deleted_successful += 1  # Count as successful since it's already deleted
                 
-                # 2. Update category available amount if transaction had a category
-                if category_id and new_available is not None and category_doc.exists:
-                    batch.update(category_ref, {"available": float(new_available)})
-                
-                # Execute all writes atomically
-                batch.commit()
+            except Exception as e:
+                print(f"❌ Failed to process deleted transaction {transaction['transaction_id']}: {e}")
+                continue
+        
+        print(f"Completed deleted transactions: {deleted_successful}/{len(deleted_transactions)} successful")
+        
+        # Check if all deleted transactions were successful
+        if deleted_successful < len(deleted_transactions):
+            print(f"❌ Not all deleted transactions were successful ({deleted_successful}/{len(deleted_transactions)}). Skipping cursor updates to allow retry.")
+            raise HTTPException(status_code=500, detail=f"Failed to process all deleted transactions. Only {deleted_successful}/{len(deleted_transactions)} were successful.")
 
         # Now that all transactions have been processed successfully, update the cursors with batch write
+        print("✅ All transactions processed successfully. Updating cursors...")
         if cursor_updates:
-            batch = db.batch()
-            for item_id, cursor in cursor_updates.items():
-                print(f"Updating cursor for item {item_id} to {cursor}")
-                item_ref = db.collection("plaid_items").document(item_id)
-                batch.update(item_ref, {"cursor": cursor})
-            batch.commit()
-            print(f"Updated {len(cursor_updates)} cursors atomically")
-
-        print("Sync completed successfully")
-        return {"message": "Transactions synced successfully."}
+            try:
+                batch = db.batch()
+                for item_id, cursor in cursor_updates.items():
+                    print(f"Updating cursor for item {item_id} to {cursor}")
+                    item_ref = db.collection("plaid_items").document(item_id)
+                    batch.update(item_ref, {"cursor": cursor})
+                batch.commit()
+                print(f"✅ Updated {len(cursor_updates)} cursors atomically")
+            except Exception as e:
+                print(f"❌ Failed to update cursors: {e}")
+                raise HTTPException(status_code=500, detail=f"Transactions synced successfully but failed to update cursors: {e}")
+        
+        print("🎉 Sync completed successfully")
+        return {
+            "message": "Transactions synced successfully.",
+            "summary": {
+                "added": f"{successful_batches}/{total_batches} batches ({len(added_transactions)} transactions)",
+                "modified": f"{modified_successful}/{len(modified_transactions)} transactions",
+                "deleted": f"{deleted_successful}/{len(deleted_transactions)} transactions",
+                "cursors_updated": len(cursor_updates)
+            }
+        }
     except Exception as e:
         print(f"Error during sync: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to sync transactions: {e}")

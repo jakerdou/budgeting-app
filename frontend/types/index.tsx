@@ -16,6 +16,13 @@ export type Transaction = {
     type: string;
     user_id: string;
     account_name: string;
+    merchant_name?: string;
+    pending?: boolean;
+    personal_finance_category?: {
+        confidence_level?: string;
+        detailed?: string;
+        primary?: string;
+    };
 };
 
 type Account = {

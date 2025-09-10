@@ -17,6 +17,9 @@ class Transaction(FirestoreModel):
     plaid_transaction_id: Optional[str] = None
     institution_name: Optional[str] = None
     account_name: Optional[str] = None
+    merchant_name: Optional[str] = None  # Plaid merchant name
+    personal_finance_category: Optional[Dict[str, Any]] = None  # Plaid personal finance category
+    pending: Optional[bool] = None  # Whether the transaction is pending
     
     @classmethod
     def collection_name(cls) -> str:

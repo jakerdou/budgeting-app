@@ -173,6 +173,37 @@ export default function TransactionInfoModal({
               <Text style={styles.label}>Account:</Text>
               <Text style={styles.value}>{localTransaction.account_name}</Text>
             </View>
+
+            {localTransaction.merchant_name && (
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Merchant:</Text>
+                <Text style={styles.value}>{localTransaction.merchant_name}</Text>
+              </View>
+            )}
+
+            {localTransaction.pending !== undefined && localTransaction.pending !== null && (
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Status:</Text>
+                <Text style={[
+                  styles.value,
+                  localTransaction.pending ? styles.pendingStatus : styles.completedStatus
+                ]}>
+                  {localTransaction.pending ? 'Pending' : 'Completed'}
+                </Text>
+              </View>
+            )}
+
+            {localTransaction.personal_finance_category && (
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Plaid Category:</Text>
+                <Text style={styles.value}>
+                  {localTransaction.personal_finance_category.primary}
+                  {localTransaction.personal_finance_category.detailed && 
+                    ` - ${localTransaction.personal_finance_category.detailed.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}`
+                  }
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.section}>
@@ -183,10 +214,10 @@ export default function TransactionInfoModal({
               <Text style={styles.value}>{localTransaction.id}</Text>
             </View>
 
-            <View style={styles.infoRow}>
+            {/* <View style={styles.infoRow}>
               <Text style={styles.label}>User ID:</Text>
               <Text style={styles.value}>{localTransaction.user_id}</Text>
-            </View>
+            </View> */}
           </View>
         </ScrollView>
       </View>
@@ -279,5 +310,13 @@ const styles = StyleSheet.create({
   uncategorizedText: {
     color: '#bbb',
     fontStyle: 'italic',
+  },
+  pendingStatus: {
+    color: '#ffa500',
+    fontWeight: '600',
+  },
+  completedStatus: {
+    color: '#28a745',
+    fontWeight: '600',
   },
 });
