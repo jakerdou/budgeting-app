@@ -1,7 +1,7 @@
 // CategoriesProvider.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onSnapshot, collection, query, where } from 'firebase/firestore';
-import { db } from '../firebaseConfig.env';
+import { db } from '../firebaseConfig.env.js';
 import { useAuth } from '@/context/AuthProvider';
 
 type Category = {
