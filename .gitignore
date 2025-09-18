@@ -19,7 +19,7 @@ web-build/
 expo-env.d.ts
 # @end expo-cli
 
-.env
+.env*
 
 backend/**/__pycache__/
 backend/api-venv/

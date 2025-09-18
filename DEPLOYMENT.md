@@ -8,6 +8,11 @@
 npx expo export --platform web
 ```
 
+### Building if you changed the .env file
+```bash
+npx expo export --platform web --clear
+```
+
 ### Deploy to Production
 ```bash
 eas deploy
